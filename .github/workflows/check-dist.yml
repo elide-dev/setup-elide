@@ -1,12 +1,4 @@
-# In TypeScript actions, `dist/index.js` is a special file. When you reference
-# an action with `uses:`, `dist/index.js` is the code that will be run. For this
-# project, the `dist/index.js` file is generated from other source files through
-# the build process. We need to make sure that the checked-in `dist/index.js`
-# file matches what is expected from the build.
-#
-# This workflow will fail if the checked-in `dist/index.js` file does not match
-# what is expected from the build.
-name: Check dist/
+name: Check Dist
 
 on:
   push:
@@ -21,7 +13,7 @@ on:
 
 jobs:
   check-dist:
-    name: Check dist/
+    name: "Check: Dist"
     runs-on: ubuntu-latest
 
     permissions:
@@ -29,25 +21,30 @@ jobs:
       statuses: write
 
     steps:
-      - name: Checkout
+      - name: "Setup: Checkout"
         id: checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: "Setup: PNPM"
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8.9.0
+
+      - name: "Setup: Node"
         uses: actions/setup-node@v3
         with:
-          node-version: 18
-          cache: npm
+          node-version: 20
+          cache: pnpm
 
-      - name: Install Dependencies
+      - name: "Setup: Install Dependencies"
         id: install
-        run: npm ci
+        run: pnpm install
 
-      - name: Build dist/ Directory
+      - name: "Build: Bundle"
         id: build
         run: npm run bundle
 
-      - name: Compare Expected and Actual Directories
+      - name: "Check: Compare Expected and Actual Directories"
         id: diff
         run: |
           if [ "$(git diff --ignore-space-at-eol --text dist/ | wc -l)" -gt "0" ]; then
@@ -56,9 +53,8 @@ jobs:
             exit 1
           fi
 
-      # If index.js was different than expected, upload the expected version as
-      # a workflow artifact.
-      - uses: actions/upload-artifact@v3
+      - name: "Build: Upload Artifact"
+        uses: actions/upload-artifact@v3
         if: ${{ failure() && steps.diff.conclusion == 'failure' }}
         with:
           name: dist

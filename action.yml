@@ -1,18 +1,38 @@
-name: 'The name of your action here'
-description: 'Provide a description here'
-author: 'Your name or organization here'
+name: 'Setup Elide'
+description: 'Sets up the Elide runtime within GitHub Actions'
+author: 'Elide'
 
-# Define your inputs here.
 inputs:
-  milliseconds:
-    description: 'Your input description here'
-    required: true
-    default: '1000'
+  version:
+    description: 'Version'
+    required: false
+    default: 'latest'
 
-# Define your outputs here.
+  os:
+    description: 'OS'
+    required: false
+
+  arch:
+    description: 'Architecture'
+    required: false
+
+  export_path:
+    description: 'Expot to Path'
+    required: false
+    default: false
+    type: boolean
+
+  custom_url:
+    description: 'Custom Download URL'
+    required: false
+
+  token:
+    description: 'GitHub Token'
+    required: false
+
 outputs:
-  time:
-    description: 'Your output description here'
+  path:
+    description: 'Path to Elide'
 
 runs:
   using: node20

@@ -1,5 +1,28 @@
 import * as core from '@actions/core'
-import { wait } from './wait'
+import { ActionOutputName, ElideSetupActionOutputs } from './outputs'
+import buildOptions, { OptionName, ElideSetupActionOptions } from './options'
+import { downloadRelease } from './releases'
+
+function stringOption(
+  option: string,
+  defaultValue?: string
+): string | undefined {
+  const value: string = core.getInput(option)
+  core.debug(`Property value: ${option}=${value || defaultValue}`)
+
+  if (!value) {
+    return defaultValue || undefined
+  }
+  return value
+}
+
+function booleanOption(option: string, defaultValue: boolean): boolean {
+  const value: boolean = core.getBooleanInput(option)
+  if (value !== null && value !== undefined) {
+    return value
+  }
+  return defaultValue
+}
 
 /**
  * The main function for the action.
@@ -7,18 +30,31 @@ import { wait } from './wait'
  */
 export async function run(): Promise<void> {
   try {
-    const ms: string = core.getInput('milliseconds')
+    // resolve effective plugin options
+    const effectiveOptions: ElideSetupActionOptions = buildOptions({
+      version: stringOption(OptionName.VERSION, 'latest'),
+      os: stringOption(OptionName.OS),
+      arch: stringOption(OptionName.ARCH),
+      export_path: booleanOption(OptionName.EXPORT_PATH, true),
+      custom_url: stringOption(OptionName.CUSTOM_URL)
+    })
 
-    // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
-    core.debug(`Waiting ${ms} milliseconds ...`)
+    // download the release tarball (resolving version if needed)
+    const release = await downloadRelease(effectiveOptions)
 
-    // Log the current timestamp, wait, then log the new timestamp
-    core.debug(new Date().toTimeString())
-    await wait(parseInt(ms, 10))
-    core.debug(new Date().toTimeString())
+    // if instructed, add Elide to the path
+    if (effectiveOptions.export_path) {
+      core.addPath(release.elideBin)
+    }
 
-    // Set outputs for other workflow steps to use
-    core.setOutput('time', new Date().toTimeString())
+    // begin preparing outputs
+    const outputs: ElideSetupActionOutputs = {
+      path: release.elidePath,
+      version: effectiveOptions.version
+    }
+
+    // mount outputs
+    core.setOutput(ActionOutputName.PATH, outputs.path)
   } catch (error) {
     // Fail the workflow run if an error occurs
     if (error instanceof Error) core.setFailed(error.message)
