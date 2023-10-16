@@ -1,9 +1,9 @@
-
 # GitHub Action: Setup Elide
 
 [![Linter](https://github.com/elide-dev/setup-elide/actions/workflows/linter.yml/badge.svg)](https://github.com/super-linter/super-linter)
 ![CI](https://github.com/elide-dev/setup-elide/actions/workflows/ci.yml/badge.svg)
 ![Coverage](./badges/coverage.svg)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Felide-dev%2Fsetup-elide.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Felide-dev%2Fsetup-elide?ref=badge_shield)
 
 This repository provides a [GitHub Action][0] to setup the [Elide][1] runtime within your workflows.
 
@@ -44,3 +44,7 @@ Elide is a new runtime and framework designed for the polyglot era. Mix and matc
 [2]: https://www.youtube.com/watch?v=Txl9ryfbCw4
 [3]: https://elide.dev/discord
 
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Felide-dev%2Fsetup-elide.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Felide-dev%2Fsetup-elide?ref=badge_large)
