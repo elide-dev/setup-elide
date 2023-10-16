@@ -1,4 +1,4 @@
-name: Lint Code Base
+name: Lint
 
 on:
   pull_request:
@@ -10,7 +10,7 @@ on:
 
 jobs:
   lint:
-    name: Lint Code Base
+    name: "Check: Lint"
     runs-on: ubuntu-latest
 
     permissions:
@@ -19,21 +19,26 @@ jobs:
       statuses: write
 
     steps:
-      - name: Checkout
+      - name: "Setup: Checkout"
         id: checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: "Setup: PNPM"
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8.9.0
+
+      - name: "Setup: Node"
         id: setup-node
         uses: actions/setup-node@v3
         with:
-          node-version: 18
-          cache: npm
+          node-version: 20
+          cache: pnpm
 
-      - name: Install Dependencies
+      - name: "Setup: Install Dependencies"
         id: install
-        run: npm ci
-
+        run: pnpm install
+  
       - name: Lint Code Base
         id: super-linter
         uses: super-linter/super-linter/slim@v5
