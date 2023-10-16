@@ -1,7 +1,8 @@
-name: Continuous Integration
+name: CI
 
 on:
-  pull_request:
+  pull_request: {}
+  merge_group: {}
   push:
     branches:
       - main
@@ -9,52 +10,88 @@ on:
 
 jobs:
   test-typescript:
-    name: TypeScript Tests
+    name: "Test: Unit Tests"
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: "Setup: Checkout"
         id: checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: "Setup: PNPM"
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8.9.0
+
+      - name: "Setup: Node"
         id: setup-node
         uses: actions/setup-node@v3
         with:
-          node-version: 18
-          cache: npm
+          node-version: 20
+          cache: pnpm
 
-      - name: Install Dependencies
-        id: npm-ci
-        run: npm ci
-
+      - name: "Setup: Install Dependencies"
+        id: install
+        run: pnpm install && pnpm install -g turbo
+  
       - name: Check Format
         id: npm-format-check
-        run: npm run format:check
+        run: pnpm run format:check
 
       - name: Lint
         id: npm-lint
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Test
         id: npm-ci-test
-        run: npm run ci-test
+        run: pnpm run ci:test
+        env:
+          BUILDLESS_APIKEY: ${{ secrets.BUILDLESS_APIKEY }}
+
+      - name: "Test: Sonar"
+        uses: SonarSource/sonarcloud-github-action@master
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=elide-dev
+            -Dsonar.projectKey=elide-dev_setup-elide
+            -Dsonar.python.coverage.reportPaths=coverage.xml
+            -Dsonar.sources=src/
+            -Dsonar.tests=__tests__/
+            -Dsonar.verbose=true
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.testExecutionReportPaths=test-report.xml
+
+      - name: "Report: Coverage"
+        uses: codecov/codecov-action@v3
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   test-action:
-    name: GitHub Actions Test
+    name: "Test: Actions"
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: "Setup: Checkout"
         id: checkout
         uses: actions/checkout@v4
 
-      - name: Test Local Action
+      - name: "Test: Local Action"
         id: test-action
         uses: ./
-        with:
-          milliseconds: 1000
+        with: {}
 
-      - name: Print Output
+      - name: "Test: Print Output"
         id: output
-        run: echo "${{ steps.test-action.outputs.time }}"
+        run: echo "${{ steps.test-action.outputs.path }}"
+
+  check-dist:
+    name: "Test: Dist"
+    uses: ./.github/workflows/check-dist.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      statuses: write
