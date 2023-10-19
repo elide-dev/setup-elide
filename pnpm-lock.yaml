@@ -53,8 +53,8 @@ devDependencies:
     specifier: 6.7.5
     version: registry.npmjs.org/@typescript-eslint/parser@6.7.5(eslint@8.51.0)(typescript@5.2.2)
   '@vercel/ncc':
-    specifier: 0.38.0
-    version: registry.npmjs.org/@vercel/ncc@0.38.0
+    specifier: 0.38.1
+    version: registry.npmjs.org/@vercel/ncc@0.38.1
   eslint:
     specifier: 8.51.0
     version: registry.npmjs.org/eslint@8.51.0
@@ -2168,10 +2168,10 @@ packages:
       eslint-visitor-keys: registry.npmjs.org/eslint-visitor-keys@3.4.3
     dev: true
 
-  registry.npmjs.org/@vercel/ncc@0.38.0:
-    resolution: {integrity: sha512-B4YKZMm/EqMptKSFyAq4q2SlgJe+VCmEH6Y8gf/E1pTlWbsUJpuH1ymik2Ex3aYO5mCWwV1kaSYHSQOT8+4vHA==, registry: https://npm.pkg.st/, tarball: https://registry.npmjs.org/@vercel/ncc/-/ncc-0.38.0.tgz}
+  registry.npmjs.org/@vercel/ncc@0.38.1:
+    resolution: {integrity: sha512-IBBb+iI2NLu4VQn3Vwldyi2QwaXt5+hTyh58ggAMoCGE6DJmPvwL3KPBWcJl1m9LYPChBLE980Jw+CS4Wokqxw==, registry: https://npm.pkg.st/, tarball: https://registry.npmjs.org/@vercel/ncc/-/ncc-0.38.1.tgz}
     name: '@vercel/ncc'
-    version: 0.38.0
+    version: 0.38.1
     hasBin: true
     dev: true
 
