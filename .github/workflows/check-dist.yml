@@ -29,7 +29,7 @@ jobs:
       - name: "Setup: PNPM"
         uses: pnpm/action-setup@d882d12c64e032187b2edb46d3a0d003b7a43598 # v2.4.0
         with:
-          version: 8.9.0
+          version: 9.1.4
 
       - name: "Setup: Node"
         uses: actions/setup-node@5e21ff4d9bc1a8cf6de233a3057d20ec6b3fb69d # v3.8.1
@@ -39,11 +39,11 @@ jobs:
 
       - name: "Setup: Install Dependencies"
         id: install
-        run: pnpm install && pnpm install -g turbo
+        run: pnpm install --frozen-lockfile && pnpm install -g turbo
 
       - name: "Build: Bundle"
         id: build
-        run: turbo build --token ${{ secrets.BUILDLESS_APIKEY }} --no-daemon --remote-only
+        run: pnpm run build
 
       - name: "Check: Compare Expected and Actual Directories"
         id: diff

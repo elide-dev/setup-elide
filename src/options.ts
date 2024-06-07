@@ -10,6 +10,7 @@ export enum OptionName {
   ARCH = 'arch',
   EXPORT_PATH = 'export_path',
   CUSTOM_URL = 'custom_url',
+  VERSION_TAG = 'version_tag',
   TOKEN = 'token',
   TARGET = 'target',
   FORCE = 'force'
@@ -49,6 +50,9 @@ export interface ElideSetupActionOptions {
 
   // Custom download URL to use in place of interpreted download URLs.
   custom_url?: string
+
+  // Version tag corresponding to a custom download URL.
+  version_tag?: string
 
   // Custom GitHub token to use, or the workflow's default token, if any.
   token?: string

@@ -121,7 +121,8 @@ export async function run(
           ),
           export_path: booleanOption(OptionName.EXPORT_PATH, true),
           token: stringOption(OptionName.TOKEN, process.env.GITHUB_TOKEN),
-          custom_url: stringOption(OptionName.CUSTOM_URL)
+          custom_url: stringOption(OptionName.CUSTOM_URL),
+          version_tag: stringOption(OptionName.VERSION_TAG)
         })
 
     // make sure the requested version, platform, and os triple is supported
