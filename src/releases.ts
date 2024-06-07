@@ -6,7 +6,7 @@ import type { ElideSetupActionOptions } from './options'
 import { GITHUB_DEFAULT_HEADERS } from './config'
 import { obtainVersion } from './command'
 
-const downloadBase = 'https://dl.azr.elide.cloud'
+const downloadBase = 'https://elide.zip'
 const downloadPathV1 = 'cli/v1/snapshot'
 
 /**
@@ -125,6 +125,7 @@ function buildDownloadUrl(
  * @param archive Path to the archive.
  * @param elideHome Unpack target.
  * @param archiveType Type of archive to unpack.
+ * @param resolvedVersion Actual version (not a symbolic version)
  * @param options Options which apply to this action run.
  * @return Path to the unpacked release.
  */
@@ -132,6 +133,7 @@ async function unpackRelease(
   archive: string,
   elideHome: string,
   archiveType: ArchiveType,
+  resolvedVersion: string,
   options: ElideSetupActionOptions
 ): Promise<string> {
   let target: string
@@ -158,7 +160,10 @@ async function unpackRelease(
           core.debug(
             `Extracting as tgz on Unix or Linux, from: ${archive}, to: ${elideHome}`
           )
-          target = await toolCache.extractTar(archive, elideHome)
+          target = await toolCache.extractTar(archive, elideHome, [
+            'xz',
+            '--strip-components=1'
+          ])
           break
       }
     }
@@ -167,6 +172,15 @@ async function unpackRelease(
     core.warning(`Failed to extract Elide release: ${err}`)
     target = elideHome
   }
+
+  // determine if the archive has a directory root
+  if (
+    resolvedVersion === '1.0.0-alpha7' ||
+    resolvedVersion === '1.0.0-alpha8'
+  ) {
+    return target // no directory root: early release
+  }
+  core.debug(`Elide release ${resolvedVersion} extracted at ${target}`)
   return target
 }
 
@@ -184,7 +198,7 @@ export async function resolveLatestVersion(
     'GET /repos/{owner}/{repo}/releases/latest',
     {
       owner: 'elide-dev',
-      repo: 'releases',
+      repo: 'elide',
       headers: GITHUB_DEFAULT_HEADERS
     }
   )
@@ -269,16 +283,19 @@ async function maybeDownload(
       elideArchive,
       elideHome,
       archiveType,
+      version.tag_name,
       options
     )
   }
 
-  return {
+  const result = {
     version,
     elidePath,
     elideHome,
     elideBin
   }
+  core.debug(`Elide release info: ${JSON.stringify(result)}`)
+  return result
 }
 
 /**
@@ -295,6 +312,7 @@ export async function downloadRelease(
     try {
       core.debug(`Downloading custom archive: ${options.custom_url}`)
       const customArchive = await toolCache.downloadTool(options.custom_url)
+      const versionTag = options.version_tag || 'dev'
 
       // sniff archive type from URL
       let archiveType: ArchiveType = ArchiveType.GZIP
@@ -309,14 +327,15 @@ export async function downloadRelease(
         customArchive,
         elideHome,
         archiveType,
+        versionTag,
         options
       )
       const elideBin = elideHome
       /* istanbul ignore next */
       const elidePath =
         options.os === ElideOS.WINDOWS
-          ? `${elideHome}\\elide.exe`
-          : `${elideHome}/elide`
+          ? `${elideBin}\\elide.exe`
+          : `${elideBin}/elide`
 
       return {
         version: {

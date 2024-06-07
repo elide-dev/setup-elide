@@ -95,10 +95,11 @@ describe('action', () => {
     setupMocks()
 
     const sourceUrl =
-      'https://dl.azr.elide.cloud/cli/v1/snapshot/darwin-aarch64/1.0.0-alpha7/elide.tgz'
+      'https://elide.zip/cli/v1/snapshot/darwin-aarch64/1.0.0-alpha9/elide.tgz'
     await main.run({
       force: true,
-      custom_url: sourceUrl
+      custom_url: sourceUrl,
+      version_tag: '1.0.0-alpha9'
     })
     expect(action).toHaveReturned()
     expect(action).not.toThrow()
@@ -159,7 +160,7 @@ describe('action', () => {
     setupMocks()
     await main.run({
       force: true,
-      version: '1.0.0-alpha7'
+      version: '1.0.0-alpha9'
     })
     expect(action).toHaveReturned()
     expect(action).not.toThrow()
