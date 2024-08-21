@@ -52,7 +52,7 @@ jobs:
         run: pnpm run test
 
       - name: "Test: Sonar"
-        uses: SonarSource/sonarcloud-github-action@5ee47de3c96f0c1c51b09d2ff1fec0cfeefcf67c # master
+        uses: SonarSource/sonarcloud-github-action@eb211723266fe8e83102bac7361f0a05c3ac1d1b # master
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
