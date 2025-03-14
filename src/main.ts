@@ -1,7 +1,7 @@
 import * as core from '@actions/core'
 import * as io from '@actions/io'
 import { ActionOutputName, ElideSetupActionOutputs } from './outputs'
-import { prewarm, selftest, info, obtainVersion } from './command'
+import { prewarm, info, obtainVersion } from './command'
 
 import buildOptions, {
   OptionName,
@@ -81,7 +81,6 @@ export async function postInstall(
   options: ElideSetupActionOptions
 ): Promise<void> {
   if (options.prewarm) await prewarm(bin)
-  if (options.selftest) await selftest(bin)
   await info(bin)
 }
 

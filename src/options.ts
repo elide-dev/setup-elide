@@ -45,9 +45,6 @@ export interface ElideSetupActionOptions {
   // Whether to pre-warm the installed copy of Elide; defaults to `true`.
   prewarm: boolean
 
-  // Whether to perform a self-test after installing Elide; defaults to `true`.
-  selftest: boolean
-
   // Custom download URL to use in place of interpreted download URLs.
   custom_url?: string
 
@@ -85,7 +82,6 @@ export const defaults: ElideSetupActionOptions = {
   cache: true,
   export_path: true,
   force: false,
-  selftest: true,
   prewarm: true,
   os: normalizeOs(process.platform),
   arch: normalizeArch(process.arch),
