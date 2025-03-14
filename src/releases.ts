@@ -5,8 +5,9 @@ import * as github from '@actions/github'
 import type { ElideSetupActionOptions } from './options'
 import { GITHUB_DEFAULT_HEADERS } from './config'
 import { obtainVersion } from './command'
-import { which } from '@actions/io'
+import { which, mv } from '@actions/io'
 import { spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 
 const downloadBase = 'https://elide.zip'
 const downloadPathV1 = 'cli/v1/snapshot'
@@ -188,8 +189,20 @@ async function unpackRelease(
           }
           core.debug(`xz command found at: ${xzTool}`)
 
+          // xz is moody about archive names. so rename it.
+          const tarArchive = `${archive}.tar`
+          const xzArchive = `${tarArchive}.xz`
+          await mv(archive, xzArchive, { force: false })
+
+          // check if the archive exists
+          if (!existsSync(xzArchive)) {
+            throw new Error(
+              `Archive not found (renaming failed?): ${xzArchive} (renamed)`
+            )
+          }
+
           // unpack using xz first; we pass `-v` for verbose and `-d` to decompress
-          const xzRun = spawnSync(xzTool, ['-v', '-d', archive], {
+          const xzRun = spawnSync(xzTool, ['-v', '-d', xzArchive], {
             encoding: 'utf-8'
           })
           if (xzRun.status !== 0) {
@@ -200,14 +213,16 @@ async function unpackRelease(
           core.debug(`XZ extraction completed: ${xzRun.status}`)
 
           // now extract the tarball
-          target = await toolCache.extractTar(archive, elideHome, [
+          target = await toolCache.extractTar(tarArchive, elideHome, [
             'x',
             '--strip-components=1'
           ])
 
           // now clean up the xz file
           try {
-            const cleanupRun = spawnSync('rm', [archive], { encoding: 'utf-8' })
+            const cleanupRun = spawnSync('rm', [archive, tarArchive], {
+              encoding: 'utf-8'
+            })
             if (cleanupRun.status !== 0) {
               console.warn('Failed to remove archive: ', cleanupRun)
             }
