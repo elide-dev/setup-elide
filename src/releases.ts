@@ -9,7 +9,7 @@ import { which, mv } from '@actions/io'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 
-const downloadBase = 'https://elide.zip'
+const downloadBase = 'https://gha.elide.zip'
 const downloadPathV1 = 'cli/v1/snapshot'
 
 /**
