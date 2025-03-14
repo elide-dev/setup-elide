@@ -5,6 +5,8 @@ import * as github from '@actions/github'
 import type { ElideSetupActionOptions } from './options'
 import { GITHUB_DEFAULT_HEADERS } from './config'
 import { obtainVersion } from './command'
+import { which } from '@actions/io'
+import { spawnSync } from 'node:child_process'
 
 const downloadBase = 'https://elide.zip'
 const downloadPathV1 = 'cli/v1/snapshot'
@@ -29,6 +31,9 @@ export type ElideVersionInfo = {
 export enum ArchiveType {
   // Release is compressed with `gzip`.
   GZIP = 'gzip',
+
+  // Release is compressed as a tarball with `xz`.
+  TXZ = 'txz',
 
   // Release is compressed with `zip`.
   ZIP = 'zip'
@@ -98,16 +103,22 @@ export interface DownloadedToolInfo {
  * @param options Effective options.
  * @return URL and archive type to use.
  */
-function buildDownloadUrl(
+async function buildDownloadUrl(
   options: ElideSetupActionOptions,
   version: ElideVersionInfo
-): { url: URL; archiveType: ArchiveType } {
+): Promise<{ url: URL; archiveType: ArchiveType }> {
   let ext = 'tgz'
   let archiveType = ArchiveType.GZIP
+  const hasXz = await which('xz')
+
   /* istanbul ignore next */
   if (options.os === ElideOS.WINDOWS) {
     ext = 'zip'
     archiveType = ArchiveType.ZIP
+  } else if (hasXz) {
+    // use xz if available
+    ext = 'txz'
+    archiveType = ArchiveType.TXZ
   }
 
   return {
@@ -164,6 +175,46 @@ async function unpackRelease(
             'xz',
             '--strip-components=1'
           ])
+          break
+
+        // extract as txz
+        case ArchiveType.TXZ:
+          core.debug(
+            `Extracting as txz on Unix or Linux, from: ${archive}, to: ${elideHome}`
+          )
+          const xzTool = await which('xz')
+          if (!xzTool) {
+            throw new Error('xz command not found, please install xz-utils')
+          }
+          core.debug(`xz command found at: ${xzTool}`)
+
+          // unpack using xz first; we pass `-v` for verbose and `-d` to decompress
+          const xzRun = spawnSync(xzTool, ['-v', '-d', archive], {
+            encoding: 'utf-8'
+          })
+          if (xzRun.status !== 0) {
+            console.log('XZ output: ', xzRun.stdout)
+            console.error('XZ error output: ', xzRun.stderr)
+            throw new Error(`xz extraction failed: ${xzRun.stderr}`)
+          }
+          core.debug(`XZ extraction completed: ${xzRun.status}`)
+
+          // now extract the tarball
+          target = await toolCache.extractTar(archive, elideHome, [
+            'x',
+            '--strip-components=1'
+          ])
+
+          // now clean up the xz file
+          try {
+            const cleanupRun = spawnSync('rm', [archive], { encoding: 'utf-8' })
+            if (cleanupRun.status !== 0) {
+              console.warn('Failed to remove archive: ', cleanupRun)
+            }
+          } catch (err) {
+            /* istanbul ignore next */
+            core.warning(`Failed to remove archive (skipping): ${err}`)
+          }
           break
       }
     }
@@ -227,7 +278,7 @@ async function maybeDownload(
   options: ElideSetupActionOptions
 ): Promise<ElideRelease> {
   // build download URL, use result from cache or disk
-  const { url, archiveType } = buildDownloadUrl(options, version)
+  const { url, archiveType } = await buildDownloadUrl(options, version)
   core.info(`Installing from URL: ${url} (type: ${archiveType})`)
 
   let targetBin = `${options.target}/elide`

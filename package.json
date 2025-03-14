@@ -33,7 +33,8 @@
     "@actions/http-client": "2.2.3",
     "@actions/io": "1.1.3",
     "@actions/tool-cache": "2.0.2",
-    "octokit": "3.1.1"
+    "octokit": "3.1.1",
+    "which": "5.0.0"
   },
   "devDependencies": {
     "bun": "1.2.5",
@@ -70,7 +71,7 @@
     "format:write": "prettier --write **/*.ts",
     "format:check": "prettier --check **/*.ts",
     "lint": "npx eslint . -c ./.github/linters/.eslintrc.yml",
-    "package": "ncc build src/index.ts --license licenses.txt",
+    "package": "ncc build src/index.ts --v8-cache --minify --source-map --license licenses.txt --target es2024",
     "package:watch": "pnpm run package -- --watch",
     "test": "jest --detectOpenHandles && make-coverage-badge --output-path ./.github/badges/coverage.svg",
     "all": "pnpm run format:write && pnpm run lint && pnpm run build && pnpm run test"
