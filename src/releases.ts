@@ -217,19 +217,6 @@ async function unpackRelease(
             'x',
             '--strip-components=1'
           ])
-
-          // now clean up the xz file
-          try {
-            const cleanupRun = spawnSync('rm', [archive, tarArchive], {
-              encoding: 'utf-8'
-            })
-            if (cleanupRun.status !== 0) {
-              console.warn('Failed to remove archive: ', cleanupRun)
-            }
-          } catch (err) {
-            /* istanbul ignore next */
-            core.warning(`Failed to remove archive (skipping): ${err}`)
-          }
           break
       }
     }
