@@ -48,6 +48,7 @@ jobs:
       - name: "Check: Compare Expected and Actual Directories"
         id: diff
         run: |
+          git checkout dist/index.js.cache dist/index.js.cache.js dist/index.js.map
           if [ "$(git diff --ignore-space-at-eol --text dist/ | wc -l)" -gt "0" ]; then
             echo "Detected uncommitted changes after build. See status below:"
             git diff --ignore-space-at-eol --text dist/

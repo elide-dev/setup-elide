@@ -157,6 +157,8 @@ async function unpackRelease(
       )
       target = await toolCache.extractZip(archive, elideHome)
     } else {
+      const tarArchive = `${archive}.tar`
+
       switch (archiveType) {
         // extract as zip
         /* istanbul ignore next */
@@ -180,37 +182,38 @@ async function unpackRelease(
 
         // extract as txz
         case ArchiveType.TXZ:
-          core.debug(
-            `Extracting as txz on Unix or Linux, from: ${archive}, to: ${elideHome}`
-          )
-          const xzTool = await which('xz')
-          if (!xzTool) {
-            throw new Error('xz command not found, please install xz-utils')
-          }
-          core.debug(`xz command found at: ${xzTool}`)
-
-          // xz is moody about archive names. so rename it.
-          const tarArchive = `${archive}.tar`
-          const xzArchive = `${tarArchive}.xz`
-          await mv(archive, xzArchive, { force: false })
-
-          // check if the archive exists
-          if (!existsSync(xzArchive)) {
-            throw new Error(
-              `Archive not found (renaming failed?): ${xzArchive} (renamed)`
+          {
+            core.debug(
+              `Extracting as txz on Unix or Linux, from: ${archive}, to: ${elideHome}`
             )
-          }
+            const xzTool = await which('xz')
+            if (!xzTool) {
+              throw new Error('xz command not found, please install xz-utils')
+            }
+            core.debug(`xz command found at: ${xzTool}`)
 
-          // unpack using xz first; we pass `-v` for verbose and `-d` to decompress
-          const xzRun = spawnSync(xzTool, ['-v', '-d', xzArchive], {
-            encoding: 'utf-8'
-          })
-          if (xzRun.status !== 0) {
-            console.log('XZ output: ', xzRun.stdout)
-            console.error('XZ error output: ', xzRun.stderr)
-            throw new Error(`xz extraction failed: ${xzRun.stderr}`)
+            // xz is moody about archive names. so rename it.
+            const xzArchive = `${tarArchive}.xz`
+            await mv(archive, xzArchive, { force: false })
+
+            // check if the archive exists
+            if (!existsSync(xzArchive)) {
+              throw new Error(
+                `Archive not found (renaming failed?): ${xzArchive} (renamed)`
+              )
+            }
+
+            // unpack using xz first; we pass `-v` for verbose and `-d` to decompress
+            const xzRun = spawnSync(xzTool, ['-v', '-d', xzArchive], {
+              encoding: 'utf-8'
+            })
+            if (xzRun.status !== 0) {
+              console.log('XZ output: ', xzRun.stdout)
+              console.error('XZ error output: ', xzRun.stderr)
+              throw new Error(`xz extraction failed: ${xzRun.stderr}`)
+            }
+            core.debug(`XZ extraction completed: ${xzRun.status}`)
           }
-          core.debug(`XZ extraction completed: ${xzRun.status}`)
 
           // now extract the tarball
           target = await toolCache.extractTar(tarArchive, elideHome, [
