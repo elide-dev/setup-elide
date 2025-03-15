@@ -14,10 +14,7 @@ export enum ElideCommand {
   RUN = 'run',
 
   // Print runtime environment info.
-  INFO = 'info',
-
-  // Run the embedded self-test suite.
-  SELFTEST = 'selftest'
+  INFO = 'info'
 }
 
 /**
@@ -51,17 +48,6 @@ export async function prewarm(bin: string): Promise<void> {
 export async function info(bin: string): Promise<void> {
   core.debug(`Printing runtime info at bin: ${bin}`)
   return execElide(bin, [ElideCommand.INFO])
-}
-
-/**
- * Run Elide's embedded self-test suite.
- *
- * @param bin Path to the Elide binary.
- * @return Promise which resolves when finished.
- */
-export async function selftest(bin: string): Promise<void> {
-  core.info(`Running Elide's self-test...`)
-  return execElide(bin, [ElideCommand.SELFTEST])
 }
 
 /**
