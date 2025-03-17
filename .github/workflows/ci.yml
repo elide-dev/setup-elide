@@ -69,7 +69,7 @@ jobs:
             -Dsonar.testExecutionReportPaths=test-report.xml
 
       - name: "Report: Coverage"
-        uses: codecov/codecov-action@eaaf4bedf32dbdc6b720b63067d99c4d77d6047d # v3.1.4
+        uses: codecov/codecov-action@0565863a31f2c772f9f0395002a31e3f06189574 # v5.4.0
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
