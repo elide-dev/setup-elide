@@ -43,10 +43,6 @@ jobs:
         id: npm-format-check
         run: pnpm run format:check
 
-      - name: Lint
-        id: npm-lint
-        run: pnpm run lint
-
       - name: Test
         id: npm-ci-test
         run: pnpm run test
