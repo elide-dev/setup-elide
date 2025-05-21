@@ -70,11 +70,11 @@
     "ci:test": "pnpm run turbo:test",
     "format:write": "prettier --write **/*.ts",
     "format:check": "prettier --check **/*.ts",
-    "lint": "npx eslint . -c ./.github/linters/.eslintrc.yml",
+    "lint": "npx eslint . -c ./.github/linters/.eslintrc.yaml",
     "package": "ncc build src/index.ts --v8-cache --minify --source-map --license licenses.txt --target es2024",
     "package:watch": "pnpm run package -- --watch",
     "test": "jest --detectOpenHandles && make-coverage-badge --output-path ./.github/badges/coverage.svg",
-    "all": "pnpm run format:write && pnpm run lint && pnpm run build && pnpm run test"
+    "all": "pnpm run format:write && pnpm run build && pnpm run test"
   },
   "license": "MIT",
   "jestSonar": {},
