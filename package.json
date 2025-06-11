@@ -48,7 +48,7 @@
     "bun": "1.2.13",
     "eslint": "9.27.0",
     "eslint-plugin-github": "6.0.0",
-    "eslint-plugin-jest": "28.11.0",
+    "eslint-plugin-jest": "28.13.3",
     "eslint-plugin-jsonc": "2.20.1",
     "eslint-plugin-prettier": "5.4.0",
     "husky": "9.1.7",
