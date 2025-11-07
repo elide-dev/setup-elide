@@ -47,7 +47,7 @@ describe('action', () => {
     await main.run()
     expect(action).toHaveReturned()
     expect(action).not.toThrow()
-    expect(setFailed).not.toBeCalled()
+    expect(setFailed).not.toHaveBeenCalled()
     expect(getInput).toHaveBeenCalledWith(OptionName.VERSION)
     expect(getInput).toHaveBeenCalledWith(OptionName.OS)
     expect(getInput).toHaveBeenCalledWith(OptionName.ARCH)
@@ -68,7 +68,7 @@ describe('action', () => {
     await main.run()
     expect(action).toHaveReturned()
     expect(action).not.toThrow()
-    expect(setFailed).not.toBeCalled()
+    expect(setFailed).not.toHaveBeenCalled()
     expect(setOutput).toHaveBeenCalledWith(
       ActionOutputName.PATH,
       expect.anything()
@@ -88,7 +88,7 @@ describe('action', () => {
       await main.run()
     }
     expect(runner).not.toThrow()
-    expect(setFailed).toBeCalled()
+    expect(setFailed).toHaveBeenCalled()
   })
 
   // it('should support downloading from a custom url', async () => {
@@ -145,7 +145,7 @@ describe('action', () => {
     })
     expect(action).toHaveReturned()
     expect(action).not.toThrow()
-    expect(setFailed).not.toBeCalled()
+    expect(setFailed).not.toHaveBeenCalled()
     expect(setOutput).toHaveBeenCalledWith(
       ActionOutputName.PATH,
       expect.anything()
@@ -164,7 +164,7 @@ describe('action', () => {
     })
     expect(action).toHaveReturned()
     expect(action).not.toThrow()
-    expect(setFailed).not.toBeCalled()
+    expect(setFailed).not.toHaveBeenCalled()
     expect(setOutput).toHaveBeenCalledWith(
       ActionOutputName.PATH,
       expect.anything()
@@ -187,7 +187,7 @@ describe('action', () => {
         )
         if (err) throw err
       }
-      expect(t).toThrowError()
+      expect(t).toThrow()
       getInput.mockImplementation((name: string): string => {
         switch (name) {
           case OptionName.OS:
@@ -200,7 +200,7 @@ describe('action', () => {
       })
 
       await main.run({ os, arch })
-      expect(setFailed).toBeCalled()
+      expect(setFailed).toHaveBeenCalled()
     })
   }
   const itShouldAllow = (os: ElideOS, arch: ElideArch) => {
@@ -215,7 +215,7 @@ describe('action', () => {
         )
         if (err) throw err
       }
-      expect(t).not.toThrowError()
+      expect(t).not.toThrow()
     })
   }
 
