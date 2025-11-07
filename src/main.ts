@@ -67,8 +67,9 @@ export function notSupported(options: ElideSetupActionOptions): null | Error {
   const spec = `${options.os}-${options.arch}`
   switch (spec) {
     case 'linux-amd64':
-      return null
+    case 'linux-aarch64':
     case 'darwin-aarch64':
+    case 'darwin-amd64':
       return null
     default:
       core.error(`Platform is not supported: ${spec}`)
