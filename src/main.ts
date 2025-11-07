@@ -144,10 +144,10 @@ export async function run(
 
         /* istanbul ignore next */
         if (
-          version !== effectiveOptions.version ||
-          effectiveOptions.version === 'latest'
+          version === effectiveOptions.version ||
+          effectiveOptions.version === 'local'
         ) {
-          core.warning(
+          core.info(
             `Existing Elide installation at version '${version}' was preserved`
           )
           core.setOutput(ActionOutputName.PATH, existing)
