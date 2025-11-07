@@ -301,7 +301,9 @@ async function maybeDownload(
   let elideDir: string | null = null
 
   try {
-    core.debug(`Checking for cached tool 'elide' at version '${version.tag_name}'`)
+    core.debug(
+      `Checking for cached tool 'elide' at version '${version.tag_name}'`
+    )
     elideDir = toolCache.find('elide', version.tag_name, options.arch)
   } catch (err) {
     /* istanbul ignore next */
