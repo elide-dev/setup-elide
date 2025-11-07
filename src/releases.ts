@@ -301,6 +301,7 @@ async function maybeDownload(
   let elideDir: string | null = null
 
   try {
+    core.debug(`Checking for cached tool 'elide' at version '${version.tag_name}'`)
     elideDir = toolCache.find('elide', version.tag_name, options.arch)
   } catch (err) {
     /* istanbul ignore next */
@@ -373,7 +374,9 @@ export async function downloadRelease(
       // sniff archive type from URL
       let archiveType: ArchiveType = ArchiveType.GZIP
       /* istanbul ignore next */
-      if (options.custom_url.endsWith('.zip')) {
+      if (options.custom_url.endsWith('.txz')) {
+        archiveType = ArchiveType.TXZ
+      } else if (options.custom_url.endsWith('.zip')) {
         archiveType = ArchiveType.ZIP
       }
 
