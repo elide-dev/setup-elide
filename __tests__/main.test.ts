@@ -220,12 +220,11 @@ describe('action', () => {
   }
 
   // test rejected platforms
-  itShouldReject(ElideOS.WINDOWS, ElideArch.AMD64)
   itShouldReject(ElideOS.WINDOWS, ElideArch.ARM64)
-  itShouldReject(ElideOS.MACOS, ElideArch.AMD64)
-  itShouldReject(ElideOS.LINUX, ElideArch.ARM64)
 
   // test allowed platforms
   itShouldAllow(ElideOS.LINUX, ElideArch.AMD64)
   itShouldAllow(ElideOS.MACOS, ElideArch.ARM64)
+  itShouldAllow(ElideOS.MACOS, ElideArch.AMD64)
+  itShouldAllow(ElideOS.WINDOWS, ElideArch.AMD64)
 })
