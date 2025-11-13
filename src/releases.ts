@@ -297,6 +297,7 @@ async function maybeDownload(
   let elidePath: string = targetBin
   /* istanbul ignore next */
   let elideHome: string = process.env.ELIDE_HOME || options.target
+  let elidePathTarget = elideHome;
   const elideBin: string = elideHome // @TODO(sgammon): bin folder?
   let elideDir: string | null = null
 
@@ -345,12 +346,26 @@ async function maybeDownload(
       version.tag_name,
       options
     )
+    elidePathTarget = elideHome;
+    if (options.cache) {
+      // cache the tool
+      const cachedPath = await toolCache.cacheDir(
+        elideHome,
+        'elide',
+        version.tag_name,
+        options.arch);
+
+      elidePathTarget = cachedPath;
+      core.debug(`Elide release cached at: ${cachedPath}`);
+    } else {
+      core.debug('Tool caching is disabled; not caching downloaded release')
+    }
   }
 
   const result = {
     version,
     elidePath,
-    elideHome,
+    elideHome: elidePathTarget,
     elideBin
   }
   core.debug(`Elide release info: ${JSON.stringify(result)}`)
