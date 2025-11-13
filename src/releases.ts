@@ -284,19 +284,21 @@ async function maybeDownload(
 ): Promise<ElideRelease> {
   // build download URL, use result from cache or disk
   const { url, archiveType } = await buildDownloadUrl(options, version)
-  core.info(`Installing from URL: ${url} (type: ${archiveType})`)
+  let targetBin = `${options.install_path}/elide`
 
-  let targetBin = `${options.target}/elide`
+  if (options.no_cache === true) {
+    console.info('Tool caching is disabled.')
+  }
 
   /* istanbul ignore next */
   if (options.os === ElideOS.WINDOWS) {
-    targetBin = `${options.target}\\elide.exe`
+    targetBin = `${options.install_path}\\elide.exe`
   }
 
   // build resulting tarball path and resolved tool info
   let elidePath: string = targetBin
   /* istanbul ignore next */
-  let elideHome: string = process.env.ELIDE_HOME || options.target
+  let elideHome: string = process.env.ELIDE_HOME || options.install_path
   let elidePathTarget = elideHome
   const elideBin: string = elideHome // @TODO(sgammon): bin folder?
   let elideDir: string | null = null
@@ -315,6 +317,7 @@ async function maybeDownload(
     // we have an existing cached copy of elide
     core.debug('Caching enabled and cached Elide release found; using it')
     elidePath = elideDir
+    core.info(`Using cached copy of Elide at version ${version.tag_name}`)
   } else {
     /* istanbul ignore next */
     if (options.no_cache) {
@@ -324,6 +327,8 @@ async function maybeDownload(
     } else {
       core.debug('Cache enabled but no hit was found; downloading release')
     }
+
+    core.info(`Installing from URL: ${url} (type: ${archiveType})`)
 
     // we do not have an existing copy; download it
     let elideArchive: string | null = null
@@ -339,6 +344,7 @@ async function maybeDownload(
     }
 
     core.debug(`Elide release downloaded to: ${elideArchive}`)
+
     elideHome = await unpackRelease(
       elideArchive,
       elideHome,
@@ -400,7 +406,7 @@ export async function downloadRelease(
       }
 
       /* istanbul ignore next */
-      let elideHome: string = process.env.ELIDE_HOME || options.target
+      let elideHome: string = process.env.ELIDE_HOME || options.install_path
       elideHome = await unpackRelease(
         customArchive,
         elideHome,

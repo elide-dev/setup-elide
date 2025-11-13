@@ -12,7 +12,7 @@ export enum OptionName {
   CUSTOM_URL = 'custom_url',
   VERSION_TAG = 'version_tag',
   TOKEN = 'token',
-  TARGET = 'target',
+  INSTALL_PATH = 'install_path',
   FORCE = 'force'
 }
 
@@ -33,8 +33,8 @@ export interface ElideSetupActionOptions {
   // Desired arch for the downloaded binary. If not provided, the current arch is resolved.
   arch: 'amd64' | 'aarch64'
 
-  // Directory path where Elide should be installed; if none is provided, `~/elide` is used.
-  target: string
+  // Directory path where Elide should be installed; if none is provided, conventional location is used for GHA.
+  install_path: string
 
   // Whether to disable tool and action caching.
   no_cache: boolean
@@ -71,7 +71,7 @@ export const nixDefaultPath = path.resolve(os.homedir(), 'elide')
 export const configPath = path.resolve(os.homedir(), '.elide')
 
 /* istanbul ignore next */
-const defaultTarget =
+const defaultTargetPath =
   process.platform === 'win32' ? windowsDefaultPath : nixDefaultPath
 
 /**
@@ -85,7 +85,7 @@ export const defaults: ElideSetupActionOptions = {
   prewarm: true,
   os: normalizeOs(process.platform),
   arch: normalizeArch(process.arch),
-  target: defaultTarget
+  install_path: defaultTargetPath
 }
 
 /**
