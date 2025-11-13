@@ -70,6 +70,7 @@ export function notSupported(options: ElideSetupActionOptions): null | Error {
     case 'linux-aarch64':
     case 'darwin-aarch64':
     case 'darwin-amd64':
+    case 'windows-amd64':
       return null
     default:
       core.error(`Platform is not supported: ${spec}`)
