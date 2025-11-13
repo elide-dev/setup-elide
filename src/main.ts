@@ -108,10 +108,10 @@ export async function run(
       ? buildOptions(options)
       : buildOptions({
           version: stringOption(OptionName.VERSION, 'latest'),
-          target: stringOption(
-            OptionName.TARGET,
+          install_path: stringOption(
+            OptionName.INSTALL_PATH,
             /* istanbul ignore next */
-            process.env.ELIDE_HOME || defaults.target
+            process.env.ELIDE_HOME || defaults.install_path
           ),
           os: normalizeOs(
             stringOption(OptionName.OS, process.platform) as string
