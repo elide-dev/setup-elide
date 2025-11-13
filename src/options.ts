@@ -36,8 +36,8 @@ export interface ElideSetupActionOptions {
   // Directory path where Elide should be installed; if none is provided, `~/elide` is used.
   target: string
 
-  // Whether to leverage tool and action caching.
-  cache: boolean
+  // Whether to disable tool and action caching.
+  no_cache: boolean
 
   // Whether to force installation if a copy of Elide is already installed.
   force: boolean
@@ -79,7 +79,7 @@ const defaultTarget =
  */
 export const defaults: ElideSetupActionOptions = {
   version: 'latest',
-  cache: true,
+  no_cache: false,
   export_path: true,
   force: false,
   prewarm: true,

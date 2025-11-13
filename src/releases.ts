@@ -297,7 +297,7 @@ async function maybeDownload(
   let elidePath: string = targetBin
   /* istanbul ignore next */
   let elideHome: string = process.env.ELIDE_HOME || options.target
-  let elidePathTarget = elideHome;
+  let elidePathTarget = elideHome
   const elideBin: string = elideHome // @TODO(sgammon): bin folder?
   let elideDir: string | null = null
 
@@ -311,13 +311,13 @@ async function maybeDownload(
     core.debug(`Failed to locate Elide in tool cache: ${err}`)
   }
   /* istanbul ignore next */
-  if (options.cache && elideDir) {
+  if (options.no_cache !== true && elideDir) {
     // we have an existing cached copy of elide
     core.debug('Caching enabled and cached Elide release found; using it')
     elidePath = elideDir
   } else {
     /* istanbul ignore next */
-    if (!options.cache) {
+    if (options.no_cache) {
       core.debug(
         'Cache disabled; forcing a fetch of the specified Elide release'
       )
@@ -346,17 +346,19 @@ async function maybeDownload(
       version.tag_name,
       options
     )
-    elidePathTarget = elideHome;
-    if (options.cache) {
+    elidePathTarget = elideHome
+
+    if (options.no_cache !== true) {
       // cache the tool
       const cachedPath = await toolCache.cacheDir(
         elideHome,
         'elide',
         version.tag_name,
-        options.arch);
+        options.arch
+      )
 
-      elidePathTarget = cachedPath;
-      core.debug(`Elide release cached at: ${cachedPath}`);
+      elidePathTarget = cachedPath
+      core.debug(`Elide release cached at: ${cachedPath}`)
     } else {
       core.debug('Tool caching is disabled; not caching downloaded release')
     }
