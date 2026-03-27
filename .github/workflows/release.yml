@@ -55,7 +55,7 @@ jobs:
             dist/index.js \
             dist/index.js.map \
             package.json \
-            LICENSE
+            .github/LICENSE
           sha256sum "artifacts/setup-elide-${TAG}.tar.gz" > "artifacts/setup-elide-${TAG}.tar.gz.sha256"
           echo "ARTIFACT=artifacts/setup-elide-${TAG}.tar.gz" >> "$GITHUB_ENV"
           echo "ARTIFACT_SHA=artifacts/setup-elide-${TAG}.tar.gz.sha256" >> "$GITHUB_ENV"
