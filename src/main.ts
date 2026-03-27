@@ -11,7 +11,10 @@ import buildOptions, {
   normalizeArch
 } from './options'
 
-import { downloadRelease } from './releases'
+import { downloadRelease, ElideRelease } from './releases'
+import { isDebianLike } from './platform'
+import { installViaApt } from './install-apt'
+import { installViaScript } from './install-script'
 
 function stringOption(
   option: string,
@@ -158,8 +161,24 @@ export async function run(
       }
     }
 
-    // download the release tarball (resolving version if needed)
-    const release = await downloadRelease(effectiveOptions)
+    // choose installation method based on platform
+    let release: ElideRelease
+    if (effectiveOptions.custom_url) {
+      // custom URL always uses the tarball download path
+      release = await downloadRelease(effectiveOptions)
+    } else if (effectiveOptions.os === 'linux' && (await isDebianLike())) {
+      core.info('Detected Debian/Ubuntu -- installing via apt repository')
+      release = await installViaApt(effectiveOptions)
+    } else if (
+      effectiveOptions.os === 'linux' ||
+      effectiveOptions.os === 'darwin'
+    ) {
+      core.info('Installing via install script')
+      release = await installViaScript(effectiveOptions)
+    } else {
+      // Windows: fall back to tarball/zip download
+      release = await downloadRelease(effectiveOptions)
+    }
     core.debug(`Release version: '${release.version.tag_name}'`)
 
     // if instructed, add Elide to the path
@@ -188,7 +207,7 @@ export async function run(
     // mount outputs
     core.setOutput(ActionOutputName.PATH, outputs.path)
     core.setOutput(ActionOutputName.VERSION, version)
-    core.info(`Elide installed at version ${release.version.tag_name} 🎉`)
+    core.info(`Elide installed at version ${release.version.tag_name}`)
   } catch (error) {
     // Fail the workflow run if an error occurs
     if (error instanceof Error) core.setFailed(error.message)
