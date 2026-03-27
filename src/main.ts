@@ -85,14 +85,28 @@ export async function postInstall(
   bin: string,
   options: ElideSetupActionOptions
 ): Promise<void> {
-  if (options.prewarm) await prewarm(bin)
-  await info(bin)
+  if (options.prewarm) {
+    try {
+      await prewarm(bin)
+    } catch (err) {
+      core.debug(
+        `Prewarm failed; proceeding anyway. Error: ${err instanceof Error ? err.message : err}`
+      )
+    }
+  }
+  try {
+    await info(bin)
+  } catch (err) {
+    core.debug(
+      `Info command failed; proceeding anyway. Error: ${err instanceof Error ? err.message : err}`
+    )
+  }
 }
 
 export async function resolveExistingBinary(): Promise<string | null> {
   try {
     return await io.which('elide', true)
-  } catch (err) {
+  } catch {
     // ignore: no existing copy
     return null
   }
@@ -169,6 +183,9 @@ export async function run(
     } else if (effectiveOptions.os === 'linux' && (await isDebianLike())) {
       core.info('Detected Debian/Ubuntu -- installing via apt repository')
       release = await installViaApt(effectiveOptions)
+    } else if (effectiveOptions.os === 'windows') {
+      core.info('Detected Windows -- installing via archive download')
+      release = await downloadRelease(effectiveOptions)
     } else if (
       effectiveOptions.os === 'linux' ||
       effectiveOptions.os === 'darwin'
@@ -176,7 +193,7 @@ export async function run(
       core.info('Installing via install script')
       release = await installViaScript(effectiveOptions)
     } else {
-      // Windows: fall back to tarball/zip download
+      // Unknown platform: fall back to archive download
       release = await downloadRelease(effectiveOptions)
     }
     core.debug(`Release version: '${release.version.tag_name}'`)
@@ -197,8 +214,8 @@ export async function run(
     await postInstall(release.elidePath, effectiveOptions)
     const version = await obtainVersion(release.elidePath)
 
-    /* istanbul ignore next */
-    if (version !== release.version.tag_name) {
+    const isNightly = release.version.tag_name.startsWith('nightly-')
+    if (!isNightly && version !== release.version.tag_name) {
       core.warning(
         `Elide version mismatch: expected '${release.version.tag_name}', but got '${version}'`
       )

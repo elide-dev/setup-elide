@@ -1,26 +1,54 @@
-import * as exec from '@actions/exec'
-import * as io from '@actions/io'
-import * as core from '@actions/core'
-import * as command from '../src/command'
-import { installViaApt } from '../src/install-apt'
-import buildOptions from '../src/options'
+import { describe, it, expect, beforeEach, jest, mock } from 'bun:test'
+
+// Create mock functions
+const execMock = jest.fn().mockResolvedValue(0)
+const whichMock = jest.fn().mockResolvedValue('/usr/bin/elide')
+const obtainVersionMock = jest.fn().mockResolvedValue('1.0.0')
+const infoMock = jest.fn()
+const debugMock = jest.fn()
+
+// Mock modules before import
+mock.module('@actions/exec', () => ({
+  exec: execMock,
+  getExecOutput: jest.fn()
+}))
+mock.module('@actions/io', () => ({
+  which: whichMock,
+  mv: jest.fn(),
+  cp: jest.fn(),
+  rmRF: jest.fn(),
+  mkdirP: jest.fn()
+}))
+mock.module('@actions/core', () => ({
+  info: infoMock,
+  debug: debugMock,
+  error: jest.fn(),
+  warning: jest.fn(),
+  getInput: jest.fn().mockReturnValue(''),
+  setFailed: jest.fn(),
+  setOutput: jest.fn(),
+  addPath: jest.fn()
+}))
+mock.module('../src/command', () => ({
+  obtainVersion: obtainVersionMock,
+  prewarm: jest.fn(),
+  info: jest.fn()
+}))
+
+const { installViaApt } = await import('../src/install-apt')
+const { default: buildOptions } = await import('../src/options')
 
 describe('install-apt', () => {
-  const execSpy = jest.spyOn(exec, 'exec')
-  const whichSpy = jest.spyOn(io, 'which')
-  const obtainVersionSpy = jest.spyOn(command, 'obtainVersion')
-
   beforeEach(() => {
-    jest.clearAllMocks()
+    execMock.mockClear()
+    whichMock.mockClear()
+    obtainVersionMock.mockClear()
+    infoMock.mockClear()
+    debugMock.mockClear()
 
-    // suppress log output
-    jest.spyOn(core, 'info').mockImplementation(() => {})
-    jest.spyOn(core, 'debug').mockImplementation(() => {})
-
-    // default mocks: all exec calls succeed
-    execSpy.mockResolvedValue(0)
-    whichSpy.mockResolvedValue('/usr/bin/elide')
-    obtainVersionSpy.mockResolvedValue('1.0.0')
+    execMock.mockResolvedValue(0)
+    whichMock.mockResolvedValue('/usr/bin/elide')
+    obtainVersionMock.mockResolvedValue('1.0.0')
   })
 
   it('should run the correct apt commands for amd64', async () => {
@@ -32,13 +60,13 @@ describe('install-apt', () => {
     const result = await installViaApt(options)
 
     // GPG key download
-    expect(execSpy).toHaveBeenCalledWith('bash', [
+    expect(execMock).toHaveBeenCalledWith('bash', [
       '-c',
       expect.stringContaining('keys.elide.dev/gpg.key')
     ])
 
     // apt source with correct arch
-    expect(execSpy).toHaveBeenCalledWith(
+    expect(execMock).toHaveBeenCalledWith(
       'sudo',
       ['tee', '/etc/apt/sources.list.d/elide.list'],
       expect.objectContaining({
@@ -47,10 +75,10 @@ describe('install-apt', () => {
     )
 
     // apt-get update
-    expect(execSpy).toHaveBeenCalledWith('sudo', ['apt-get', 'update', '-qq'])
+    expect(execMock).toHaveBeenCalledWith('sudo', ['apt-get', 'update', '-qq'])
 
     // apt-get install elide (no version pin for latest)
-    expect(execSpy).toHaveBeenCalledWith('sudo', [
+    expect(execMock).toHaveBeenCalledWith('sudo', [
       'apt-get',
       'install',
       '-y',
@@ -70,9 +98,9 @@ describe('install-apt', () => {
     })
     await installViaApt(options)
 
-    // Check that the tee call includes arm64
-    const teeCall = execSpy.mock.calls.find(
-      call => call[0] === 'sudo' && call[1]?.[0] === 'tee'
+    const teeCall = execMock.mock.calls.find(
+      (call: unknown[]) =>
+        call[0] === 'sudo' && (call[1] as string[])?.[0] === 'tee'
     )
     expect(teeCall).toBeDefined()
     const input = teeCall![2] as { input: Buffer }
@@ -87,7 +115,7 @@ describe('install-apt', () => {
     })
     await installViaApt(options)
 
-    expect(execSpy).toHaveBeenCalledWith('sudo', [
+    expect(execMock).toHaveBeenCalledWith('sudo', [
       'apt-get',
       'install',
       '-y',

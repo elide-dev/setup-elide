@@ -1,9 +1,11 @@
-const mockAccess = jest.fn()
-jest.mock('node:fs/promises', () => ({
+import { describe, it, expect, beforeEach, mock } from 'bun:test'
+
+const mockAccess = mock(() => Promise.resolve())
+mock.module('node:fs/promises', () => ({
   access: mockAccess
 }))
 
-import { isDebianLike } from '../src/platform'
+const { isDebianLike } = await import('../src/platform')
 
 describe('platform detection', () => {
   beforeEach(() => {
