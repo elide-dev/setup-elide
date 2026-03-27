@@ -8,7 +8,8 @@ import buildOptions, {
   ElideSetupActionOptions,
   defaults,
   normalizeOs,
-  normalizeArch
+  normalizeArch,
+  normalizeChannel
 } from './options'
 
 import { downloadRelease, ElideRelease } from './releases'
@@ -136,6 +137,9 @@ export async function run(
           ),
           arch: normalizeArch(
             stringOption(OptionName.ARCH, process.arch) as string
+          ),
+          channel: normalizeChannel(
+            stringOption(OptionName.CHANNEL, 'nightly') as string
           ),
           export_path: booleanOption(OptionName.EXPORT_PATH, true),
           token: stringOption(OptionName.TOKEN, process.env.GITHUB_TOKEN),

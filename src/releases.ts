@@ -137,22 +137,16 @@ export async function buildDownloadUrl(
     archiveType = ArchiveType.TXZ
   }
 
-  // determine channel and revision from version tag
-  // tag_name examples: "nightly-20260323", "preview-20260323", "1.0.0"
-  let channel = 'release'
-  let revision = version.tag_name
-  if (version.tag_name.startsWith('nightly-')) {
-    channel = 'nightly'
-    revision = version.tag_name.slice('nightly-'.length)
-  } else if (version.tag_name.startsWith('preview-')) {
-    channel = 'preview'
-    revision = version.tag_name.slice('preview-'.length)
-  }
+  // Use the explicit channel from options; fall back to inferring from tag
+  const channel = options.channel || 'nightly'
 
-  // when version was resolved (not user-provided), use "latest" to let
-  // the CDN resolve the current artifact
+  // Determine revision: use "latest" when version is "latest",
+  // otherwise use the version as-is (a semver like "1.0.0")
+  let revision: string
   if (options.version === 'latest') {
     revision = 'latest'
+  } else {
+    revision = options.version
   }
 
   // Map internal tokens to CDN platform tags (darwin→macos, aarch64→arm64)

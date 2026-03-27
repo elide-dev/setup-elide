@@ -6,6 +6,7 @@ import path from 'node:path'
  */
 export enum OptionName {
   VERSION = 'version',
+  CHANNEL = 'channel',
   OS = 'os',
   ARCH = 'arch',
   EXPORT_PATH = 'export_path',
@@ -20,9 +21,14 @@ export enum OptionName {
  * Describes the interface provided by setup action configuration, once interpreted and once
  * defaults are applied.
  */
+export type ElideChannel = 'nightly' | 'preview' | 'release'
+
 export interface ElideSetupActionOptions {
   // Desired version of Elide; the special token `latest` resolves the latest version.
   version: string | 'latest'
+
+  // Release channel: 'nightly' (default), 'preview', or 'release'.
+  channel: ElideChannel
 
   // Whether to setup Elide on the PATH; defaults to `true`.
   export_path: boolean
@@ -79,6 +85,7 @@ const defaultTargetPath =
  */
 export const defaults: ElideSetupActionOptions = {
   version: 'latest',
+  channel: 'nightly',
   no_cache: false,
   export_path: true,
   force: false,
@@ -86,6 +93,25 @@ export const defaults: ElideSetupActionOptions = {
   os: normalizeOs(process.platform),
   arch: normalizeArch(process.arch),
   install_path: defaultTargetPath
+}
+
+/**
+ * Normalize a channel string to a recognized channel token.
+ */
+export function normalizeChannel(
+  channel: string
+): ElideChannel {
+  switch (channel.trim().toLowerCase()) {
+    case 'nightly':
+      return 'nightly'
+    case 'preview':
+      return 'preview'
+    case 'release':
+    case 'stable':
+      return 'release'
+    default:
+      return 'nightly'
+  }
 }
 
 /**

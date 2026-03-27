@@ -43,7 +43,8 @@ export async function installViaApt(
 
   // 2. Add apt source
   core.info('Adding Elide apt repository')
-  const sourceLine = `deb [arch=${arch} signed-by=/usr/share/keyrings/elide.gpg] https://dl.elide.dev nightly main`
+  const channel = options.channel || 'nightly'
+  const sourceLine = `deb [arch=${arch} signed-by=/usr/share/keyrings/elide.gpg] https://dl.elide.dev ${channel} main`
   await exec.exec('sudo', ['tee', '/etc/apt/sources.list.d/elide.list'], {
     input: Buffer.from(sourceLine)
   })

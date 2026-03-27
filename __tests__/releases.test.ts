@@ -48,128 +48,154 @@ describe('buildDownloadUrl', () => {
     whichMock.mockResolvedValue('')
   })
 
-  // --- Elide 1.0 tests (release channel, semver tags) ---
+  // --- Channel: release (Elide 1.0) ---
 
-  it('should build correct URL for Elide 1.0 linux-amd64', async () => {
+  it('should build release channel URL for linux-amd64', async () => {
     const options = buildOptions({
       os: 'linux',
       arch: 'amd64',
-      version: '1.0.0'
+      version: '1.0.0',
+      channel: 'release'
     })
-    const version = { tag_name: '1.0.0', userProvided: true }
-    const { url } = await buildDownloadUrl(options, version)
+    const { url } = await buildDownloadUrl(options, {
+      tag_name: '1.0.0',
+      userProvided: true
+    })
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/release/1.0.0/elide.linux-amd64.tgz'
     )
   })
 
-  it('should build correct URL for Elide 1.0 macos-arm64 (darwin->macos, aarch64->arm64)', async () => {
+  it('should build release channel URL for macos-arm64', async () => {
     const options = buildOptions({
       os: 'darwin',
       arch: 'aarch64',
-      version: '1.0.0'
+      version: '1.0.0',
+      channel: 'release'
     })
-    const version = { tag_name: '1.0.0', userProvided: true }
-    const { url } = await buildDownloadUrl(options, version)
+    const { url } = await buildDownloadUrl(options, {
+      tag_name: '1.0.0',
+      userProvided: true
+    })
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/release/1.0.0/elide.macos-arm64.tgz'
     )
   })
 
-  it('should build correct URL for Elide 1.0 macos-amd64', async () => {
+  it('should build release channel URL for macos-amd64', async () => {
     const options = buildOptions({
       os: 'darwin',
       arch: 'amd64',
-      version: '1.0.0'
+      version: '1.0.0',
+      channel: 'release'
     })
-    const version = { tag_name: '1.0.0', userProvided: true }
-    const { url } = await buildDownloadUrl(options, version)
+    const { url } = await buildDownloadUrl(options, {
+      tag_name: '1.0.0',
+      userProvided: true
+    })
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/release/1.0.0/elide.macos-amd64.tgz'
     )
   })
 
-  it('should build correct URL for Elide 1.0 windows-amd64', async () => {
+  it('should build release channel URL for windows-amd64', async () => {
     const options = buildOptions({
       os: 'windows',
       arch: 'amd64',
-      version: '1.0.0'
+      version: '1.0.0',
+      channel: 'release'
     })
-    const version = { tag_name: '1.0.0', userProvided: true }
-    const { url, archiveType } = await buildDownloadUrl(options, version)
+    const { url, archiveType } = await buildDownloadUrl(options, {
+      tag_name: '1.0.0',
+      userProvided: true
+    })
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/release/1.0.0/elide.windows-amd64.zip'
     )
     expect(archiveType).toBe(ArchiveType.ZIP)
   })
 
-  // --- Classic tests (pre-1.0 versions like 1.0.0-beta10) ---
+  // --- Channel: release (Classic pre-1.0) ---
 
-  it('should build correct URL for classic release (1.0.0-beta10)', async () => {
+  it('should build release channel URL for classic 1.0.0-beta10', async () => {
     const options = buildOptions({
       os: 'linux',
       arch: 'amd64',
-      version: '1.0.0-beta10'
+      version: '1.0.0-beta10',
+      channel: 'release'
     })
-    const version = { tag_name: '1.0.0-beta10', userProvided: true }
-    const { url } = await buildDownloadUrl(options, version)
+    const { url } = await buildDownloadUrl(options, {
+      tag_name: '1.0.0-beta10',
+      userProvided: true
+    })
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/release/1.0.0-beta10/elide.linux-amd64.tgz'
     )
   })
 
-  it('should build correct URL for classic darwin-aarch64', async () => {
+  it('should build release channel URL for classic darwin-aarch64', async () => {
     const options = buildOptions({
       os: 'darwin',
       arch: 'aarch64',
-      version: '1.0.0-alpha7'
+      version: '1.0.0-alpha7',
+      channel: 'release'
     })
-    const version = { tag_name: '1.0.0-alpha7', userProvided: true }
-    const { url } = await buildDownloadUrl(options, version)
+    const { url } = await buildDownloadUrl(options, {
+      tag_name: '1.0.0-alpha7',
+      userProvided: true
+    })
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/release/1.0.0-alpha7/elide.macos-arm64.tgz'
     )
   })
 
-  // --- Channel tests ---
+  // --- Channel: nightly (default) ---
 
-  it('should use nightly channel and strip prefix from nightly tags', async () => {
+  it('should default to nightly channel', async () => {
     const options = buildOptions({
       os: 'linux',
       arch: 'amd64',
       version: '1.0.0'
     })
-    const version = { tag_name: 'nightly-20260323', userProvided: false }
-    const { url, archiveType } = await buildDownloadUrl(options, version)
-    expect(url.toString()).toBe(
-      'https://elide.zip/artifacts/nightly/20260323/elide.linux-amd64.tgz'
-    )
-    expect(archiveType).toBe(ArchiveType.GZIP)
-  })
-
-  it('should use preview channel and strip prefix from preview tags', async () => {
-    const options = buildOptions({
-      os: 'darwin',
-      arch: 'aarch64',
-      version: '1.0.0'
+    const { url } = await buildDownloadUrl(options, {
+      tag_name: '1.0.0',
+      userProvided: true
     })
-    const version = { tag_name: 'preview-20260323', userProvided: false }
-    const { url } = await buildDownloadUrl(options, version)
     expect(url.toString()).toBe(
-      'https://elide.zip/artifacts/preview/20260323/elide.macos-arm64.tgz'
+      'https://elide.zip/artifacts/nightly/1.0.0/elide.linux-amd64.tgz'
     )
   })
 
-  it('should use "latest" revision when version is latest', async () => {
+  it('should use nightly/latest when version is latest', async () => {
     const options = buildOptions({
       os: 'linux',
       arch: 'amd64',
       version: 'latest'
     })
-    const version = { tag_name: 'nightly-20260323', userProvided: false }
-    const { url } = await buildDownloadUrl(options, version)
+    const { url } = await buildDownloadUrl(options, {
+      tag_name: 'ignored',
+      userProvided: false
+    })
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/nightly/latest/elide.linux-amd64.tgz'
+    )
+  })
+
+  // --- Channel: preview ---
+
+  it('should use preview channel when specified', async () => {
+    const options = buildOptions({
+      os: 'darwin',
+      arch: 'aarch64',
+      version: 'latest',
+      channel: 'preview'
+    })
+    const { url } = await buildDownloadUrl(options, {
+      tag_name: 'ignored',
+      userProvided: false
+    })
+    expect(url.toString()).toBe(
+      'https://elide.zip/artifacts/preview/latest/elide.macos-arm64.tgz'
     )
   })
 
@@ -181,8 +207,10 @@ describe('buildDownloadUrl', () => {
       arch: 'amd64',
       version: 'latest'
     })
-    const version = { tag_name: 'nightly-20260323', userProvided: false }
-    const { url, archiveType } = await buildDownloadUrl(options, version)
+    const { url, archiveType } = await buildDownloadUrl(options, {
+      tag_name: 'ignored',
+      userProvided: false
+    })
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/nightly/latest/elide.windows-amd64.zip'
     )
@@ -194,10 +222,13 @@ describe('buildDownloadUrl', () => {
     const options = buildOptions({
       os: 'linux',
       arch: 'amd64',
-      version: '1.0.0'
+      version: '1.0.0',
+      channel: 'release'
     })
-    const version = { tag_name: '1.0.0', userProvided: true }
-    const { url, archiveType } = await buildDownloadUrl(options, version)
+    const { url, archiveType } = await buildDownloadUrl(options, {
+      tag_name: '1.0.0',
+      userProvided: true
+    })
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/release/1.0.0/elide.linux-amd64.txz'
     )

@@ -11,6 +11,11 @@ inputs:
     required: false
     default: 'latest'
 
+  channel:
+    description: 'Channel'
+    required: false
+    default: 'nightly'
+
   os:
     description: 'OS'
     required: false
