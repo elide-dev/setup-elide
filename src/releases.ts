@@ -9,8 +9,7 @@ import { which, mv } from '@actions/io'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 
-const downloadBase = 'https://gha.elide.zip'
-const downloadPathV1 = 'cli/v1/snapshot'
+const downloadBase = 'https://dist.elide.zip'
 
 /**
  * Version info resolved for a release of Elide.
@@ -104,7 +103,7 @@ export interface DownloadedToolInfo {
  * @param options Effective options.
  * @return URL and archive type to use.
  */
-async function buildDownloadUrl(
+export async function buildDownloadUrl(
   options: ElideSetupActionOptions,
   version: ElideVersionInfo
 ): Promise<{ url: URL; archiveType: ArchiveType }> {
@@ -122,11 +121,29 @@ async function buildDownloadUrl(
     archiveType = ArchiveType.TXZ
   }
 
+  // determine channel and revision from version tag
+  // tag_name examples: "nightly-20260323", "preview-20260323", "1.0.0"
+  let channel = 'release'
+  let revision = version.tag_name
+  if (version.tag_name.startsWith('nightly-')) {
+    channel = 'nightly'
+    revision = version.tag_name.slice('nightly-'.length)
+  } else if (version.tag_name.startsWith('preview-')) {
+    channel = 'preview'
+    revision = version.tag_name.slice('preview-'.length)
+  }
+
+  // when version was resolved (not user-provided), use "latest" to let
+  // the CDN resolve the current artifact
+  if (options.version === 'latest') {
+    revision = 'latest'
+  }
+
   return {
     archiveType,
     url: new URL(
-      // https://... / cli/v1/snapshot / (os)-(arch) / elide.(extension)
-      `${downloadBase}/${downloadPathV1}/${options.os}-${options.arch}/${version.tag_name}/elide.${ext}`
+      // https://dist.elide.zip/artifacts/{channel}/{revision}/elide.{os}-{arch}.{ext}
+      `${downloadBase}/artifacts/${channel}/${revision}/elide.${options.os}-${options.arch}.${ext}`
     )
   }
 }
@@ -284,15 +301,12 @@ async function maybeDownload(
 ): Promise<ElideRelease> {
   // build download URL, use result from cache or disk
   const { url, archiveType } = await buildDownloadUrl(options, version)
-  let targetBin = `${options.install_path}/elide`
+  const sep = options.os === ElideOS.WINDOWS ? '\\' : '/'
+  const binName = options.os === ElideOS.WINDOWS ? 'elide.exe' : 'elide'
+  let targetBin = `${options.install_path}${sep}bin${sep}${binName}`
 
   if (options.no_cache === true) {
     console.info('Tool caching is disabled.')
-  }
-
-  /* istanbul ignore next */
-  if (options.os === ElideOS.WINDOWS) {
-    targetBin = `${options.install_path}\\elide.exe`
   }
 
   // build resulting tarball path and resolved tool info
@@ -300,7 +314,7 @@ async function maybeDownload(
   /* istanbul ignore next */
   let elideHome: string = process.env.ELIDE_HOME || options.install_path
   let elidePathTarget = elideHome
-  let elideBin: string = elideHome // @TODO(sgammon): bin folder?
+  let elideBin: string = `${elideHome}${sep}bin`
   let elideDir: string | null = null
 
   try {
@@ -316,9 +330,9 @@ async function maybeDownload(
   if (options.no_cache !== true && elideDir) {
     // we have an existing cached copy of elide
     core.debug('Caching enabled and cached Elide release found; using it')
-    elidePath = `${elideDir}/elide`
+    elidePath = `${elideDir}${sep}bin${sep}${binName}`
     elidePathTarget = elideDir
-    elideBin = elideDir
+    elideBin = `${elideDir}${sep}bin`
     core.info(`Using cached copy of Elide at version ${version.tag_name}`)
   } else {
     /* istanbul ignore next */
@@ -366,7 +380,7 @@ async function maybeDownload(
       )
 
       elidePathTarget = cachedPath
-      elideBin = cachedPath
+      elideBin = `${cachedPath}${sep}bin`
       core.debug(`Elide release cached at: ${cachedPath}`)
     } else {
       core.debug('Tool caching is disabled; not caching downloaded release')
@@ -417,12 +431,10 @@ export async function downloadRelease(
         versionTag,
         options
       )
-      const elideBin = elideHome
-      /* istanbul ignore next */
-      const elidePath =
-        options.os === ElideOS.WINDOWS
-          ? `${elideBin}\\elide.exe`
-          : `${elideBin}/elide`
+      const sep = options.os === ElideOS.WINDOWS ? '\\' : '/'
+      const binName = options.os === ElideOS.WINDOWS ? 'elide.exe' : 'elide'
+      const elideBin = `${elideHome}${sep}bin`
+      const elidePath = `${elideBin}${sep}${binName}`
 
       return {
         version: {

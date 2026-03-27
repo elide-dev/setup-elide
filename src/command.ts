@@ -32,11 +32,7 @@ export enum ElideArgument {
  */
 export async function prewarm(bin: string): Promise<void> {
   core.info(`Prewarming Elide at bin: ${bin}`)
-  return execElide(bin, [
-    ElideCommand.RUN,
-    '-c',
-    '"console.log(\'Elide ready.\')"'
-  ])
+  return execElide(bin, [ElideCommand.INFO])
 }
 
 /**

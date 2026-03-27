@@ -70,8 +70,12 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   test-action:
-    name: "Test: Actions"
-    runs-on: ubuntu-latest
+    name: "Test: Actions (${{ matrix.os }})"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
       - name: Harden Runner
@@ -88,9 +92,12 @@ jobs:
         uses: ./
         with: {}
 
-      - name: "Test: Print Output"
-        id: output
-        run: echo "${{ steps.test-action.outputs.path }}"
+      - name: "Test: Verify Installation"
+        shell: bash
+        run: |
+          elide --version
+          echo "Path: ${{ steps.test-action.outputs.path }}"
+          echo "Version: ${{ steps.test-action.outputs.version }}"
 
   check-dist:
     name: "Test: Dist"
