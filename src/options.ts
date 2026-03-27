@@ -149,11 +149,9 @@ export default function buildOptions(
 ): ElideSetupActionOptions {
   return {
     ...defaults,
-    ...(opts || {}),
-    ...{
-      // force-normalize the OS and arch
-      os: normalizeOs(opts?.os || defaults.os),
-      arch: normalizeArch(opts?.arch || defaults.arch)
-    }
+    ...opts,
+    // force-normalize the OS and arch
+    os: normalizeOs(opts?.os || defaults.os),
+    arch: normalizeArch(opts?.arch || defaults.arch)
   } satisfies ElideSetupActionOptions
 }

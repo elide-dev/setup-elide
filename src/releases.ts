@@ -9,7 +9,7 @@ import { which, mv } from '@actions/io'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 
-const downloadBase = 'https://dist.elide.zip'
+const downloadBase = 'https://elide.zip'
 
 /**
  * Version info resolved for a release of Elide.
@@ -96,6 +96,22 @@ export interface DownloadedToolInfo {
 }
 
 /**
+ * Map the internal OS token to the CDN platform tag.
+ * The elide.zip CDN expects "macos" (not "darwin").
+ */
+export function cdnOs(os: string): string {
+  return os === 'darwin' ? 'macos' : os
+}
+
+/**
+ * Map the internal arch token to the CDN platform tag.
+ * The elide.zip CDN expects "arm64" (not "aarch64").
+ */
+export function cdnArch(arch: string): string {
+  return arch === 'aarch64' ? 'arm64' : arch
+}
+
+/**
  * Build a download URL for an Elide release; if a custom URL is provided as part of the set of
  * `options`, use it instead.
  *
@@ -139,11 +155,15 @@ export async function buildDownloadUrl(
     revision = 'latest'
   }
 
+  // Map internal tokens to CDN platform tags (darwin→macos, aarch64→arm64)
+  const os = cdnOs(options.os)
+  const arch = cdnArch(options.arch)
+
   return {
     archiveType,
     url: new URL(
-      // https://dist.elide.zip/artifacts/{channel}/{revision}/elide.{os}-{arch}.{ext}
-      `${downloadBase}/artifacts/${channel}/${revision}/elide.${options.os}-${options.arch}.${ext}`
+      // https://elide.zip/artifacts/{channel}/{revision}/elide.{os}-{arch}.{ext}
+      `${downloadBase}/artifacts/${channel}/${revision}/elide.${os}-${arch}.${ext}`
     )
   }
 }
@@ -310,7 +330,7 @@ async function maybeDownload(
   }
 
   // build resulting tarball path and resolved tool info
-  let elidePath: string = targetBin
+  let elidePath = targetBin
   /* istanbul ignore next */
   let elideHome: string = process.env.ELIDE_HOME || options.install_path
   let elidePathTarget = elideHome

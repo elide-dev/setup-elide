@@ -1,6 +1,0 @@
-lib/
-dist/
-node_modules/
-coverage/
-__tests__/
-.dev/

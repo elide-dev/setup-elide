@@ -1,100 +1,146 @@
-import * as io from '@actions/io'
-import * as core from '@actions/core'
-import * as platform from '../src/platform'
-import * as command from '../src/command'
-import * as installScript from '../src/install-script'
-import * as main from '../src/main'
-import buildOptions, { OptionName } from '../src/options'
-import { ElideArch, ElideOS } from '../src/releases'
-import { ActionOutputName } from '../src/outputs'
-import { resolveExistingBinary } from '../src/main'
+import { describe, it, expect, beforeEach, jest, mock } from 'bun:test'
 
-// set timeout to 3 minutes to account for downloads
-jest.setTimeout(3 * 60 * 1000)
+// Create mock functions
+const execMock = jest.fn().mockResolvedValue(0)
+const getExecOutputMock = jest
+  .fn()
+  .mockResolvedValue({ stdout: '1.0.0\n', stderr: '', exitCode: 0 })
+const whichMock = jest.fn()
+const getInputMock = jest.fn().mockReturnValue('')
+const setFailedMock = jest.fn()
+const setOutputMock = jest.fn()
+const debugMock = jest.fn()
+const infoMock = jest.fn()
+const warningMock = jest.fn()
+const errorMock = jest.fn()
+const addPathMock = jest.fn()
+const isDebianLikeMock = jest.fn().mockResolvedValue(false)
+const downloadToolMock = jest.fn().mockResolvedValue('/tmp/install.sh')
+const prewarmMock = jest.fn().mockResolvedValue(undefined)
+const cmdInfoMock = jest.fn().mockResolvedValue(undefined)
+const obtainVersionMock = jest.fn().mockResolvedValue('1.0.0')
 
-// Mock platform-specific installers. The apt and script installers have
-// their own dedicated test suites; here we just need the dispatch to
-// succeed without re-running real installations.
-jest.spyOn(platform, 'isDebianLike').mockResolvedValue(false)
-const scriptSpy = jest.spyOn(installScript, 'installViaScript')
-const prewarmSpy = jest.spyOn(command, 'prewarm')
-const infoSpy = jest.spyOn(command, 'info')
-const obtainVersionSpy = jest.spyOn(command, 'obtainVersion')
+// Mock modules before any project imports
+mock.module('@actions/exec', () => ({
+  exec: execMock,
+  getExecOutput: getExecOutputMock
+}))
+mock.module('@actions/io', () => ({
+  which: whichMock,
+  mv: jest.fn(),
+  cp: jest.fn(),
+  rmRF: jest.fn(),
+  mkdirP: jest.fn()
+}))
+mock.module('@actions/core', () => ({
+  info: infoMock,
+  debug: debugMock,
+  error: errorMock,
+  warning: warningMock,
+  getInput: getInputMock,
+  setFailed: setFailedMock,
+  setOutput: setOutputMock,
+  addPath: addPathMock
+}))
+mock.module('@actions/tool-cache', () => ({
+  downloadTool: downloadToolMock,
+  extractTar: jest.fn(),
+  extractZip: jest.fn(),
+  cacheDir: jest.fn(),
+  find: jest.fn()
+}))
+mock.module('../src/command', () => ({
+  prewarm: prewarmMock,
+  info: cmdInfoMock,
+  obtainVersion: obtainVersionMock,
+  ElideCommand: { RUN: 'run', INFO: 'info' },
+  ElideArgument: { VERSION: '--version' }
+}))
+mock.module('../src/platform', () => ({
+  isDebianLike: isDebianLikeMock
+}))
 
-// Mock the GitHub Actions core libs
-const getInput = jest.spyOn(core, 'getInput')
-const setFailed = jest.spyOn(core, 'setFailed')
-const setOutput = jest.spyOn(core, 'setOutput')
-const debug = jest.spyOn(core, 'debug')
-const info = jest.spyOn(core, 'info')
-const warning = jest.spyOn(core, 'warning')
-const error = jest.spyOn(core, 'error')
+const main = await import('../src/main')
+const { default: buildOptions, OptionName } = await import('../src/options')
+const { ElideArch, ElideOS } = await import('../src/releases')
+const { ActionOutputName } = await import('../src/outputs')
 
 const setupMocks = () => {
-  debug.mockImplementation((...args) =>
+  debugMock.mockImplementation((...args: unknown[]) =>
     console.debug.apply(console, Array.from(args))
   )
-  info.mockImplementation((...args) =>
+  infoMock.mockImplementation((...args: unknown[]) =>
     console.info.apply(console, Array.from(args))
   )
-  warning.mockImplementation((...args) =>
+  warningMock.mockImplementation((...args: unknown[]) =>
     console.warn.apply(console, Array.from(args))
   )
-  error.mockImplementation((...args) =>
+  errorMock.mockImplementation((...args: unknown[]) =>
     console.error.apply(console, Array.from(args))
   )
-  setFailed.mockImplementation(() => {})
+  setFailedMock.mockImplementation(() => {})
 }
-
-// Mock the action's main function
-const action = jest.spyOn(main, 'run')
 
 describe('action', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-    // Re-apply mocks cleared by clearAllMocks
-    jest.spyOn(platform, 'isDebianLike').mockResolvedValue(false)
-    scriptSpy.mockResolvedValue({
-      version: { tag_name: '1.0.0', userProvided: false },
-      elidePath: '/mock/bin/elide',
-      elideHome: '/mock',
-      elideBin: '/mock/bin'
+    // Clear all mock state
+    execMock.mockClear()
+    getExecOutputMock.mockClear()
+    whichMock.mockClear()
+    getInputMock.mockClear()
+    setFailedMock.mockClear()
+    setOutputMock.mockClear()
+    debugMock.mockClear()
+    infoMock.mockClear()
+    warningMock.mockClear()
+    errorMock.mockClear()
+    addPathMock.mockClear()
+    isDebianLikeMock.mockClear()
+    downloadToolMock.mockClear()
+    prewarmMock.mockClear()
+    cmdInfoMock.mockClear()
+    obtainVersionMock.mockClear()
+    // Default: getInput returns empty
+    getInputMock.mockReturnValue('')
+
+    // Default: not debian
+    isDebianLikeMock.mockResolvedValue(false)
+
+    // Default: install script path succeeds
+    downloadToolMock.mockResolvedValue('/tmp/install.sh')
+    execMock.mockResolvedValue(0)
+    whichMock.mockResolvedValue('/mock/bin/elide')
+    getExecOutputMock.mockResolvedValue({
+      stdout: '1.0.0\n',
+      stderr: '',
+      exitCode: 0
     })
-    prewarmSpy.mockResolvedValue(undefined)
-    infoSpy.mockResolvedValue(undefined)
-    obtainVersionSpy.mockResolvedValue('1.0.0')
+    prewarmMock.mockResolvedValue(undefined)
+    cmdInfoMock.mockResolvedValue(undefined)
+    obtainVersionMock.mockResolvedValue('1.0.0')
   })
 
   it('reads option inputs', async () => {
     setupMocks()
     await main.run()
-    expect(action).toHaveReturned()
-    expect(setFailed).not.toHaveBeenCalled()
-    expect(getInput).toHaveBeenCalledWith(OptionName.VERSION)
-    expect(getInput).toHaveBeenCalledWith(OptionName.OS)
-    expect(getInput).toHaveBeenCalledWith(OptionName.ARCH)
-    expect(getInput).toHaveBeenCalledWith(OptionName.TOKEN)
-    expect(getInput).toHaveBeenCalledWith(OptionName.CUSTOM_URL)
-    expect(getInput).toHaveBeenCalledWith(OptionName.EXPORT_PATH)
+    expect(setFailedMock).not.toHaveBeenCalled()
+    expect(getInputMock).toHaveBeenCalledWith(OptionName.VERSION)
+    expect(getInputMock).toHaveBeenCalledWith(OptionName.OS)
+    expect(getInputMock).toHaveBeenCalledWith(OptionName.ARCH)
+    expect(getInputMock).toHaveBeenCalledWith(OptionName.TOKEN)
+    expect(getInputMock).toHaveBeenCalledWith(OptionName.CUSTOM_URL)
+    expect(getInputMock).toHaveBeenCalledWith(OptionName.EXPORT_PATH)
   })
 
   it('sets the `path` and `version` outputs', async () => {
     setupMocks()
-    getInput.mockImplementation((name: string): string => {
-      switch (name) {
-        default:
-          return ''
-      }
-    })
-
     await main.run()
-    expect(action).toHaveReturned()
-    expect(setFailed).not.toHaveBeenCalled()
-    expect(setOutput).toHaveBeenCalledWith(
+    expect(setFailedMock).not.toHaveBeenCalled()
+    expect(setOutputMock).toHaveBeenCalledWith(
       ActionOutputName.PATH,
       expect.anything()
     )
-    expect(setOutput).toHaveBeenCalledWith(
+    expect(setOutputMock).toHaveBeenCalledWith(
       ActionOutputName.VERSION,
       expect.anything()
     )
@@ -102,72 +148,35 @@ describe('action', () => {
 
   it('should fail for unhandled exceptions', async () => {
     setupMocks()
-    info.mockImplementationOnce(() => {
+    infoMock.mockImplementationOnce(() => {
       throw new Error('oh noes')
     })
     await main.run()
-    expect(setFailed).toHaveBeenCalled()
+    expect(setFailedMock).toHaveBeenCalled()
   })
 
-  // it('should support downloading from a custom url', async () => {
-  //   setupMocks()
-
-  //   const sourceUrl =
-  //     'https://elide.zip/cli/v1/snapshot/darwin-aarch64/1.0.0-alpha9/elide.tgz'
-  //   await main.run({
-  //     force: true,
-  //     custom_url: sourceUrl,
-  //     version_tag: '1.0.0-alpha9'
-  //   })
-  //   expect(action).toHaveReturned()
-  //   expect(action).not.toThrow()
-  //   expect(setFailed).not.toBeCalled()
-  //   expect(setOutput).toHaveBeenCalledWith(
-  //     ActionOutputName.PATH,
-  //     expect.anything()
-  //   )
-  //   expect(setOutput).toHaveBeenCalledWith(
-  //     ActionOutputName.VERSION,
-  //     expect.anything()
-  //   )
-  // })
-
   it('should properly detect existing elide binary', async () => {
-    const which = jest.spyOn(io, 'which')
-    which.mockImplementationOnce(
-      async (tool: string, check?: boolean | undefined) => {
-        return '/some/path/to/an/elide/bin'
-      }
-    )
-    const existing = await resolveExistingBinary()
+    whichMock.mockResolvedValueOnce('/some/path/to/an/elide/bin')
+    const existing = await main.resolveExistingBinary()
     expect(existing).not.toBeNull()
     expect(existing).toEqual('/some/path/to/an/elide/bin')
-    jest.clearAllMocks()
   })
 
   it('should properly handle missing elide binary', async () => {
-    const which = jest.spyOn(io, 'which')
-    // @ts-ignore
-    which.mockImplementationOnce(() => {
-      return Promise.reject(new Error('not found (testing 123123)'))
-    })
-    const existing = await resolveExistingBinary()
+    whichMock.mockRejectedValueOnce(new Error('not found'))
+    const existing = await main.resolveExistingBinary()
     expect(existing).toBeNull()
-    jest.clearAllMocks()
   })
 
   it('should be able to force installation', async () => {
     setupMocks()
-    await main.run({
-      force: true
-    })
-    expect(action).toHaveReturned()
-    expect(setFailed).not.toHaveBeenCalled()
-    expect(setOutput).toHaveBeenCalledWith(
+    await main.run({ force: true })
+    expect(setFailedMock).not.toHaveBeenCalled()
+    expect(setOutputMock).toHaveBeenCalledWith(
       ActionOutputName.PATH,
       expect.anything()
     )
-    expect(setOutput).toHaveBeenCalledWith(
+    expect(setOutputMock).toHaveBeenCalledWith(
       ActionOutputName.VERSION,
       expect.anything()
     )
@@ -175,36 +184,116 @@ describe('action', () => {
 
   it('should be able to force installation of specific version', async () => {
     setupMocks()
-    await main.run({
-      force: true,
-      version: '1.0.0-alpha9'
-    })
-    expect(action).toHaveReturned()
-    expect(setFailed).not.toHaveBeenCalled()
-    expect(setOutput).toHaveBeenCalledWith(
+    await main.run({ force: true, version: '1.0.0-alpha9' })
+    expect(setFailedMock).not.toHaveBeenCalled()
+    expect(setOutputMock).toHaveBeenCalledWith(
       ActionOutputName.PATH,
       expect.anything()
     )
-    expect(setOutput).toHaveBeenCalledWith(
+    expect(setOutputMock).toHaveBeenCalledWith(
       ActionOutputName.VERSION,
       expect.anything()
     )
   })
 
-  const itShouldReject = (os: ElideOS, arch: ElideArch) => {
+  it('should gracefully handle prewarm failure', async () => {
+    setupMocks()
+    prewarmMock.mockRejectedValueOnce(new Error('prewarm boom'))
+    await main.run({ force: true })
+    expect(setFailedMock).not.toHaveBeenCalled()
+    expect(debugMock).toHaveBeenCalledWith(
+      expect.stringContaining('Prewarm failed; proceeding anyway')
+    )
+  })
+
+  it('should gracefully handle info command failure', async () => {
+    setupMocks()
+    cmdInfoMock.mockRejectedValue(new Error('info boom'))
+    await main.run({ force: true })
+    expect(setFailedMock).not.toHaveBeenCalled()
+    expect(debugMock).toHaveBeenCalledWith(
+      expect.stringContaining('Info command failed; proceeding anyway')
+    )
+  })
+
+  it('should preserve existing binary when version matches "local"', async () => {
+    setupMocks()
+    whichMock.mockResolvedValue('/existing/elide')
+    obtainVersionMock.mockResolvedValue('1.0.0')
+    await main.run({ version: 'local' })
+    expect(setOutputMock).toHaveBeenCalledWith(
+      ActionOutputName.PATH,
+      '/existing/elide'
+    )
+    expect(setOutputMock).toHaveBeenCalledWith(
+      ActionOutputName.VERSION,
+      '1.0.0'
+    )
+    expect(infoMock).toHaveBeenCalledWith(
+      expect.stringContaining('was preserved')
+    )
+  })
+
+  it('should install via apt when on debian-like linux', async () => {
+    setupMocks()
+    isDebianLikeMock.mockResolvedValue(true)
+    await main.run({ force: true, os: 'linux', arch: 'amd64' })
+    expect(infoMock).toHaveBeenCalledWith(
+      expect.stringContaining('apt repository')
+    )
+    expect(setFailedMock).not.toHaveBeenCalled()
+  })
+
+  it('should warn on version mismatch', async () => {
+    setupMocks()
+    // First call (inside installViaScript) returns the "installed" version,
+    // second call (main.run verification) returns a different version.
+    obtainVersionMock.mockResolvedValueOnce('1.0.0').mockResolvedValue('9.9.9')
+    await main.run({ force: true })
+    expect(warningMock).toHaveBeenCalledWith(
+      expect.stringContaining('Elide version mismatch')
+    )
+  })
+
+  it('should use archive download for windows', async () => {
+    setupMocks()
+    await main.run({ force: true, os: 'windows', arch: 'amd64' })
+    expect(infoMock).toHaveBeenCalledWith(
+      expect.stringContaining('Windows -- installing via archive')
+    )
+    expect(setFailedMock).not.toHaveBeenCalled()
+  })
+
+  it('should use downloadRelease for custom_url', async () => {
+    setupMocks()
+    downloadToolMock.mockResolvedValue('/tmp/custom-elide.tgz')
+    await main.run({
+      force: true,
+      custom_url: 'https://example.com/elide.tgz',
+      version_tag: '1.0.0-custom'
+    })
+    expect(downloadToolMock).toHaveBeenCalledWith(
+      'https://example.com/elide.tgz'
+    )
+    expect(setFailedMock).not.toHaveBeenCalled()
+  })
+
+  it('should not export to path when export_path is false', async () => {
+    setupMocks()
+    await main.run({ force: true, export_path: false })
+    expect(addPathMock).not.toHaveBeenCalled()
+    expect(setFailedMock).not.toHaveBeenCalled()
+  })
+
+  const itShouldReject = (os: string, arch: string) => {
     it(`should reject ${os}/${arch} as unsupported`, async () => {
       setupMocks()
       const t = () => {
-        const err = main.notSupported(
-          buildOptions({
-            os,
-            arch
-          })
-        )
+        const err = main.notSupported(buildOptions({ os, arch } as any))
         if (err) throw err
       }
       expect(t).toThrow()
-      getInput.mockImplementation((name: string): string => {
+      getInputMock.mockImplementation((name: string): string => {
         switch (name) {
           case OptionName.OS:
             return os
@@ -214,21 +303,15 @@ describe('action', () => {
             return ''
         }
       })
-
-      await main.run({ os, arch })
-      expect(setFailed).toHaveBeenCalled()
+      await main.run({ os, arch } as any)
+      expect(setFailedMock).toHaveBeenCalled()
     })
   }
-  const itShouldAllow = (os: ElideOS, arch: ElideArch) => {
+  const itShouldAllow = (os: string, arch: string) => {
     it(`should allow ${os}/${arch} as supported`, () => {
       setupMocks()
       const t = () => {
-        const err = main.notSupported(
-          buildOptions({
-            os,
-            arch
-          })
-        )
+        const err = main.notSupported(buildOptions({ os, arch } as any))
         if (err) throw err
       }
       expect(t).not.toThrow()

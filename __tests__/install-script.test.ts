@@ -1,30 +1,66 @@
-import * as exec from '@actions/exec'
-import * as io from '@actions/io'
-import * as core from '@actions/core'
-import * as toolCache from '@actions/tool-cache'
-import * as command from '../src/command'
-import { installViaScript } from '../src/install-script'
-import buildOptions from '../src/options'
+import { describe, it, expect, beforeEach, jest, mock } from 'bun:test'
+
+// Create mock functions
+const execMock = jest.fn().mockResolvedValue(0)
+const whichMock = jest.fn().mockResolvedValue('/usr/local/bin/elide')
+const downloadToolMock = jest.fn().mockResolvedValue('/tmp/install.sh')
+const obtainVersionMock = jest.fn().mockResolvedValue('1.0.0')
+const addPathMock = jest.fn()
+const infoMock = jest.fn()
+const debugMock = jest.fn()
+
+// Mock modules before import
+mock.module('@actions/exec', () => ({
+  exec: execMock,
+  getExecOutput: jest.fn()
+}))
+mock.module('@actions/io', () => ({
+  which: whichMock,
+  mv: jest.fn(),
+  cp: jest.fn(),
+  rmRF: jest.fn(),
+  mkdirP: jest.fn()
+}))
+mock.module('@actions/core', () => ({
+  info: infoMock,
+  debug: debugMock,
+  error: jest.fn(),
+  warning: jest.fn(),
+  getInput: jest.fn().mockReturnValue(''),
+  setFailed: jest.fn(),
+  setOutput: jest.fn(),
+  addPath: addPathMock
+}))
+mock.module('@actions/tool-cache', () => ({
+  downloadTool: downloadToolMock,
+  extractTar: jest.fn(),
+  extractZip: jest.fn(),
+  cacheDir: jest.fn(),
+  find: jest.fn()
+}))
+mock.module('../src/command', () => ({
+  obtainVersion: obtainVersionMock,
+  prewarm: jest.fn(),
+  info: jest.fn()
+}))
+
+const { installViaScript } = await import('../src/install-script')
+const { default: buildOptions } = await import('../src/options')
 
 describe('install-script', () => {
-  const execSpy = jest.spyOn(exec, 'exec')
-  const whichSpy = jest.spyOn(io, 'which')
-  const downloadToolSpy = jest.spyOn(toolCache, 'downloadTool')
-  const obtainVersionSpy = jest.spyOn(command, 'obtainVersion')
-  const addPathSpy = jest.spyOn(core, 'addPath')
-
   beforeEach(() => {
-    jest.clearAllMocks()
+    execMock.mockClear()
+    whichMock.mockClear()
+    downloadToolMock.mockClear()
+    obtainVersionMock.mockClear()
+    addPathMock.mockClear()
+    infoMock.mockClear()
+    debugMock.mockClear()
 
-    // suppress log output
-    jest.spyOn(core, 'info').mockImplementation(() => {})
-    jest.spyOn(core, 'debug').mockImplementation(() => {})
-
-    // default mocks
-    downloadToolSpy.mockResolvedValue('/tmp/install.sh')
-    execSpy.mockResolvedValue(0)
-    whichSpy.mockResolvedValue('/usr/local/bin/elide')
-    obtainVersionSpy.mockResolvedValue('1.0.0')
+    downloadToolMock.mockResolvedValue('/tmp/install.sh')
+    execMock.mockResolvedValue(0)
+    whichMock.mockResolvedValue('/usr/local/bin/elide')
+    obtainVersionMock.mockResolvedValue('1.0.0')
   })
 
   it('should download and execute the install script', async () => {
@@ -35,10 +71,10 @@ describe('install-script', () => {
     })
     const result = await installViaScript(options)
 
-    expect(downloadToolSpy).toHaveBeenCalledWith(
+    expect(downloadToolMock).toHaveBeenCalledWith(
       'https://dl.elide.dev/cli/install.sh'
     )
-    expect(execSpy).toHaveBeenCalledWith('bash', ['/tmp/install.sh'])
+    expect(execMock).toHaveBeenCalledWith('bash', ['/tmp/install.sh'])
     expect(result.elidePath).toBe('/usr/local/bin/elide')
     expect(result.version.tag_name).toBe('1.0.0')
   })
@@ -51,7 +87,7 @@ describe('install-script', () => {
     })
     await installViaScript(options)
 
-    expect(execSpy).toHaveBeenCalledWith('bash', [
+    expect(execMock).toHaveBeenCalledWith('bash', [
       '/tmp/install.sh',
       '--version',
       '1.2.3'
@@ -59,7 +95,7 @@ describe('install-script', () => {
   })
 
   it('should fall back to ~/.elide/bin if which fails initially', async () => {
-    whichSpy
+    whichMock
       .mockRejectedValueOnce(new Error('not found'))
       .mockResolvedValueOnce('/home/runner/.elide/bin/elide')
 
@@ -70,7 +106,7 @@ describe('install-script', () => {
     })
     const result = await installViaScript(options)
 
-    expect(addPathSpy).toHaveBeenCalled()
+    expect(addPathMock).toHaveBeenCalled()
     expect(result.elidePath).toBe('/home/runner/.elide/bin/elide')
   })
 })

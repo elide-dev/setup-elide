@@ -97,6 +97,10 @@ Thumbs.db
 # Ignore built ts files
 __tests__/runner/*
 
+# Bun build artifacts (output goes to dist/, not src/)
+src/*.js
+src/*.js.map
+
 # IDE files
 .idea
 .vscode

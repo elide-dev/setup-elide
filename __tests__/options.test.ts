@@ -1,10 +1,7 @@
+import { describe, it, expect } from 'bun:test'
 import buildOptions, { normalizeArch, normalizeOs } from '../src/options'
 
 describe('action options', () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
-  })
-
   it('should apply sensible defaults', () => {
     expect(buildOptions()).not.toBeNull()
     expect(buildOptions({})).not.toBeNull()

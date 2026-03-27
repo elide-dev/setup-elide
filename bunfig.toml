@@ -1,0 +1,5 @@
+[test]
+preload = ["./.dev/test-env.ts"]
+coverage = true
+coverageReporter = ["text", "lcov"]
+coverageDir = "coverage"
