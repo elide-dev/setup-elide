@@ -3,22 +3,33 @@ import { describe, it, expect, beforeEach, jest, mock } from 'bun:test'
 const initMock = jest.fn()
 const setTagsMock = jest.fn()
 const captureExceptionMock = jest.fn()
+const captureMessageMock = jest.fn()
 const withScopeMock = jest.fn((cb: (scope: any) => void) => {
   cb({ setTag: jest.fn() })
 })
+const startSpanMock = jest.fn((_opts: any, fn: () => Promise<any>) => fn())
+const metricsGaugeMock = jest.fn()
 const flushMock = jest.fn().mockResolvedValue(true)
 
 mock.module('@sentry/node', () => ({
   init: initMock,
   setTags: setTagsMock,
   captureException: captureExceptionMock,
+  captureMessage: captureMessageMock,
   withScope: withScopeMock,
+  startSpan: startSpanMock,
+  metrics: { gauge: metricsGaugeMock },
   flush: flushMock
 }))
 
-const { initTelemetry, reportError, flushTelemetry } = await import(
-  '../src/telemetry'
-)
+const {
+  initTelemetry,
+  reportError,
+  flushTelemetry,
+  withSpan,
+  recordMetric,
+  logEvent
+} = await import('../src/telemetry')
 const { default: buildOptions } = await import('../src/options')
 
 describe('telemetry', () => {
@@ -26,7 +37,10 @@ describe('telemetry', () => {
     initMock.mockClear()
     setTagsMock.mockClear()
     captureExceptionMock.mockClear()
+    captureMessageMock.mockClear()
     withScopeMock.mockClear()
+    startSpanMock.mockClear()
+    metricsGaugeMock.mockClear()
     flushMock.mockClear()
   })
 
@@ -42,7 +56,8 @@ describe('telemetry', () => {
     expect(initMock).toHaveBeenCalledWith(
       expect.objectContaining({
         defaultIntegrations: false,
-        environment: 'nightly'
+        environment: 'nightly',
+        tracesSampleRate: 1.0
       })
     )
   })
@@ -90,8 +105,25 @@ describe('telemetry', () => {
     expect(scrubbed.contexts).toEqual({})
   })
 
+  it('should strip sensitive data in beforeSendTransaction', () => {
+    const options = buildOptions({})
+    initTelemetry(true, options)
+
+    const beforeSendTransaction =
+      initMock.mock.calls[0][0].beforeSendTransaction
+    const event = {
+      server_name: 'runner-abc',
+      extra: { leak: true },
+      contexts: { something: {} }
+    }
+
+    const scrubbed = beforeSendTransaction(event)
+    expect(scrubbed.server_name).toBeUndefined()
+    expect(scrubbed.extra).toBeUndefined()
+    expect(scrubbed.contexts).toEqual({})
+  })
+
   it('should scrub exception values of env var secrets', () => {
-    // Set a fake sensitive env var
     const originalToken = process.env.GITHUB_TOKEN
     process.env.GITHUB_TOKEN = 'ghp_superSecretTokenValue123'
     try {
@@ -127,10 +159,7 @@ describe('telemetry', () => {
   it('should report errors via captureException', () => {
     const options = buildOptions({})
     initTelemetry(true, options)
-
-    const err = new Error('install failed')
-    reportError(err)
-
+    reportError(new Error('install failed'))
     expect(withScopeMock).toHaveBeenCalled()
   })
 
@@ -144,8 +173,6 @@ describe('telemetry', () => {
     })
 
     reportError(new Error('fail'), { phase: 'download' })
-
-    expect(withScopeMock).toHaveBeenCalled()
     expect(setTagMock).toHaveBeenCalledWith('phase', 'download')
   })
 
@@ -154,6 +181,61 @@ describe('telemetry', () => {
     reportError(new Error('should not send'))
     expect(withScopeMock).not.toHaveBeenCalled()
   })
+
+  // --- Tracing ---
+
+  it('withSpan should call Sentry.startSpan when enabled', async () => {
+    initTelemetry(true, buildOptions({}))
+    const result = await withSpan('test-op', 'test', async () => 42)
+    expect(result).toBe(42)
+    expect(startSpanMock).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'test-op', op: 'test' }),
+      expect.any(Function)
+    )
+  })
+
+  it('withSpan should run function directly when disabled', async () => {
+    initTelemetry(false, buildOptions({}))
+    const result = await withSpan('test-op', 'test', async () => 99)
+    expect(result).toBe(99)
+    expect(startSpanMock).not.toHaveBeenCalled()
+  })
+
+  // --- Metrics ---
+
+  it('recordMetric should call metrics.gauge when enabled', () => {
+    initTelemetry(true, buildOptions({}))
+    recordMetric('install_duration', 1500, 'millisecond', { os: 'linux' })
+    expect(metricsGaugeMock).toHaveBeenCalledWith('install_duration', 1500, {
+      unit: 'millisecond',
+      tags: { os: 'linux' }
+    })
+  })
+
+  it('recordMetric should no-op when disabled', () => {
+    initTelemetry(false, buildOptions({}))
+    recordMetric('install_duration', 1500, 'millisecond')
+    expect(metricsGaugeMock).not.toHaveBeenCalled()
+  })
+
+  // --- Logging ---
+
+  it('logEvent should call captureMessage when enabled', () => {
+    initTelemetry(true, buildOptions({}))
+    logEvent('setup-elide.start', { installer: 'shell' })
+    expect(captureMessageMock).toHaveBeenCalledWith('setup-elide.start', {
+      level: 'info',
+      tags: { installer: 'shell' }
+    })
+  })
+
+  it('logEvent should no-op when disabled', () => {
+    initTelemetry(false, buildOptions({}))
+    logEvent('setup-elide.start')
+    expect(captureMessageMock).not.toHaveBeenCalled()
+  })
+
+  // --- Flush ---
 
   it('should flush pending events', async () => {
     initTelemetry(true, buildOptions({}))

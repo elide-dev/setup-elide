@@ -1,7 +1,14 @@
 import * as core from '@actions/core'
 import * as io from '@actions/io'
 import { elideInfo, obtainVersion } from './command'
-import { initTelemetry, reportError, flushTelemetry } from './telemetry'
+import {
+  initTelemetry,
+  reportError,
+  flushTelemetry,
+  withSpan,
+  recordMetric,
+  logEvent
+} from './telemetry'
 
 /**
  * Enumerates outputs and maps them to their well-known names.
@@ -149,132 +156,158 @@ export async function run(
 
     // Init telemetry early so errors during install are captured
     initTelemetry(effectiveOptions.telemetry, effectiveOptions)
+    logEvent('setup-elide.start', {
+      installer: effectiveOptions.installer,
+      version: effectiveOptions.version,
+      os: effectiveOptions.os,
+      arch: effectiveOptions.arch
+    })
 
-    // --- Validate platform ---
-    const supportErr = notSupported(effectiveOptions)
-    if (supportErr) {
-      core.error(supportErr.message, { title: 'Platform Not Supported' })
-      core.setFailed(supportErr.message)
-      return
-    }
-
-    // --- Check for existing binary ---
-    if (!effectiveOptions.force) {
-      const existing: string | null = await resolveExistingBinary()
-      if (existing) {
-        core.debug(
-          `Located existing Elide binary at: '${existing}'. Obtaining version...`
-        )
-        await postInstall(existing)
-        const version = await obtainVersion(existing)
-
-        if (
-          version === effectiveOptions.version ||
-          effectiveOptions.version === 'local'
-        ) {
-          core.notice(`Existing Elide ${version} preserved at ${existing}`, {
-            title: 'Already Installed'
-          })
-          core.setOutput(ActionOutputName.PATH, existing)
-          core.setOutput(ActionOutputName.VERSION, version)
-          core.setOutput(ActionOutputName.CACHED, 'true')
-          core.setOutput(ActionOutputName.INSTALLER, 'none')
-          return
-        }
+    await withSpan('setup-elide', 'setup', async () => {
+      // --- Validate platform ---
+      const supportErr = notSupported(effectiveOptions)
+      if (supportErr) {
+        core.error(supportErr.message, { title: 'Platform Not Supported' })
+        core.setFailed(supportErr.message)
+        return
       }
-    }
 
-    // --- Validate installer for platform ---
-    let installer = effectiveOptions.installer
-    const validation = validateInstallerForPlatform(
-      installer,
-      effectiveOptions.os
-    )
-    if (!validation.valid) {
-      core.warning(
-        `Installer '${installer}' is not supported on ${effectiveOptions.os}: ${validation.reason}. Falling back to 'archive'.`,
-        { title: 'Installer Fallback' }
-      )
-      installer = 'archive'
-    }
-
-    // --- Install ---
-    const release: ElideRelease = await core.group(
-      `📦 Installing Elide via ${installer}`,
-      async () => {
-        if (effectiveOptions.custom_url) {
-          core.info(`Using custom URL: ${effectiveOptions.custom_url}`)
-          return downloadRelease(effectiveOptions)
-        }
-
-        switch (installer) {
-          case 'archive':
-            return downloadRelease(effectiveOptions)
-          case 'shell':
-            return installViaShell(effectiveOptions)
-          case 'msi':
-            return installViaMsi(effectiveOptions)
-          case 'pkg':
-            return installViaPkg(effectiveOptions)
-          case 'apt':
-            return installViaApt(effectiveOptions)
-          case 'rpm':
-            return installViaRpm(effectiveOptions)
-        }
-      }
-    )
-    core.debug(`Release version: '${release.version.tag_name}'`)
-
-    // --- Post-install ---
-    const version: string = await core.group(
-      '✅ Verifying installation',
-      async () => {
-        if (effectiveOptions.export_path) {
-          core.info(`Adding '${release.elideBin}' to PATH`)
-          core.addPath(release.elideBin)
-        }
-
-        await postInstall(release.elidePath)
-        const ver = await obtainVersion(release.elidePath)
-
-        const isNightly = release.version.tag_name.startsWith('nightly-')
-        if (!isNightly && ver !== release.version.tag_name) {
-          core.warning(
-            `Elide version mismatch: expected '${release.version.tag_name}', but got '${ver}'`,
-            { title: 'Version Mismatch' }
+      // --- Check for existing binary ---
+      if (!effectiveOptions.force) {
+        const existing: string | null = await resolveExistingBinary()
+        if (existing) {
+          core.debug(
+            `Located existing Elide binary at: '${existing}'. Obtaining version...`
           )
+          await postInstall(existing)
+          const version = await obtainVersion(existing)
+
+          if (
+            version === effectiveOptions.version ||
+            effectiveOptions.version === 'local'
+          ) {
+            core.notice(`Existing Elide ${version} preserved at ${existing}`, {
+              title: 'Already Installed'
+            })
+            core.setOutput(ActionOutputName.PATH, existing)
+            core.setOutput(ActionOutputName.VERSION, version)
+            core.setOutput(ActionOutputName.CACHED, 'true')
+            core.setOutput(ActionOutputName.INSTALLER, 'none')
+            logEvent('setup-elide.exit', { status: 'cached' })
+            return
+          }
         }
-
-        return ver
       }
-    )
 
-    // --- Set outputs ---
-    const cached = release.cached ?? false
-    core.setOutput(ActionOutputName.PATH, release.elidePath)
-    core.setOutput(ActionOutputName.VERSION, version)
-    core.setOutput(ActionOutputName.CACHED, cached ? 'true' : 'false')
-    core.setOutput(ActionOutputName.INSTALLER, installer)
+      // --- Validate installer for platform ---
+      let installer = effectiveOptions.installer
+      const validation = validateInstallerForPlatform(
+        installer,
+        effectiveOptions.os
+      )
+      if (!validation.valid) {
+        core.warning(
+          `Installer '${installer}' is not supported on ${effectiveOptions.os}: ${validation.reason}. Falling back to 'archive'.`,
+          { title: 'Installer Fallback' }
+        )
+        installer = 'archive'
+      }
 
-    if (cached) {
-      core.notice(`Using cached Elide ${release.version.tag_name}`, {
-        title: 'Cache Hit'
+      // --- Install ---
+      const release: ElideRelease = await core.group(
+        `📦 Installing Elide via ${installer}`,
+        async () =>
+          withSpan(`install.${installer}`, 'install', async () => {
+            if (effectiveOptions.custom_url) {
+              core.info(`Using custom URL: ${effectiveOptions.custom_url}`)
+              return downloadRelease(effectiveOptions)
+            }
+
+            switch (installer) {
+              case 'archive':
+                return downloadRelease(effectiveOptions)
+              case 'shell':
+                return installViaShell(effectiveOptions)
+              case 'msi':
+                return installViaMsi(effectiveOptions)
+              case 'pkg':
+                return installViaPkg(effectiveOptions)
+              case 'apt':
+                return installViaApt(effectiveOptions)
+              case 'rpm':
+                return installViaRpm(effectiveOptions)
+            }
+          })
+      )
+      core.debug(`Release version: '${release.version.tag_name}'`)
+
+      // --- Post-install ---
+      const version: string = await core.group(
+        '✅ Verifying installation',
+        async () =>
+          withSpan('verify', 'verify', async () => {
+            if (effectiveOptions.export_path) {
+              core.info(`Adding '${release.elideBin}' to PATH`)
+              core.addPath(release.elideBin)
+            }
+
+            await postInstall(release.elidePath)
+            const ver = await obtainVersion(release.elidePath)
+
+            const isNightly = release.version.tag_name.startsWith('nightly-')
+            if (!isNightly && ver !== release.version.tag_name) {
+              core.warning(
+                `Elide version mismatch: expected '${release.version.tag_name}', but got '${ver}'`,
+                { title: 'Version Mismatch' }
+              )
+            }
+
+            return ver
+          })
+      )
+
+      // --- Set outputs ---
+      const cached = release.cached ?? false
+      core.setOutput(ActionOutputName.PATH, release.elidePath)
+      core.setOutput(ActionOutputName.VERSION, version)
+      core.setOutput(ActionOutputName.CACHED, cached ? 'true' : 'false')
+      core.setOutput(ActionOutputName.INSTALLER, installer)
+
+      if (cached) {
+        core.notice(`Using cached Elide ${release.version.tag_name}`, {
+          title: 'Cache Hit'
+        })
+      }
+
+      const elapsed = Date.now() - startTime
+      core.info(
+        `Elide ${release.version.tag_name} installed in ${elapsed < 1000 ? `${elapsed}ms` : `${(elapsed / 1000).toFixed(1)}s`}`
+      )
+
+      // Record install duration as a metric
+      recordMetric('setup_elide.duration_ms', elapsed, 'millisecond', {
+        installer,
+        os: effectiveOptions.os,
+        arch: effectiveOptions.arch,
+        cached: cached ? 'true' : 'false'
       })
-    }
 
-    const elapsed = Date.now() - startTime
-    core.info(
-      `Elide ${release.version.tag_name} installed in ${elapsed < 1000 ? `${elapsed}ms` : `${(elapsed / 1000).toFixed(1)}s`}`
-    )
+      logEvent('setup-elide.exit', {
+        status: 'success',
+        installer,
+        version,
+        cached: cached ? 'true' : 'false'
+      })
 
-    await writeSummary(
-      version,
-      effectiveOptions,
-      installer,
-      release.elidePath,
-      cached,
-      elapsed
-    )
+      await writeSummary(
+        version,
+        effectiveOptions,
+        installer,
+        release.elidePath,
+        cached,
+        elapsed
+      )
+    })
   } catch (error) {
     if (error instanceof Error) {
       reportError(error)

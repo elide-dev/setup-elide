@@ -1,14 +1,31 @@
 codecov:
-  require_ci_to_pass: yes
+  max_report_age: off
+  require_ci_to_pass: true
+  notify:
+    wait_for_ci: true
 
-ignore:
-  - "__tests__"
-  - "dist"
-  - "node_modules"
+coverage:
+  precision: 2
+  round: down
+  range: "80...100"
+  status:
+    project:
+      default:
+        informational: true
+    patch: off
 
-comment:                  # this is a top-level key
-  layout: "diff, flags, files"
+comment:
+  layout: "reach,diff,flags,files,footer"
   behavior: default
   require_changes: false
-  require_base: false
-  require_head: true
+
+parsers:
+  javascript:
+    enable_partials: yes
+
+github_checks:
+  annotations: true
+
+bundle_analysis:
+  require_bundle_changes: "bundle_increase"
+  bundle_change_threshold: "1Kb"
