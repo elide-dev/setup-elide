@@ -69,10 +69,19 @@ mock.module('../src/command', () => ({
   ElideCommand: { RUN: 'run', INFO: 'info' },
   ElideArgument: { VERSION: '--version' }
 }))
+const withSpanMock = jest.fn(
+  async (_name: string, _op: string, fn: () => Promise<any>) => fn()
+)
+const recordMetricMock = jest.fn()
+const logEventMock = jest.fn()
+
 mock.module('../src/telemetry', () => ({
   initTelemetry: initTelemetryMock,
   reportError: reportErrorMock,
-  flushTelemetry: flushTelemetryMock
+  flushTelemetry: flushTelemetryMock,
+  withSpan: withSpanMock,
+  recordMetric: recordMetricMock,
+  logEvent: logEventMock
 }))
 
 const main = await import('../src/main')
@@ -117,6 +126,9 @@ describe('action', () => {
     initTelemetryMock.mockClear()
     reportErrorMock.mockClear()
     flushTelemetryMock.mockClear()
+    withSpanMock.mockClear()
+    recordMetricMock.mockClear()
+    logEventMock.mockClear()
     summaryMock.addHeading.mockClear()
     summaryMock.addTable.mockClear()
     summaryMock.write.mockClear()
@@ -138,6 +150,9 @@ describe('action', () => {
     elideInfoMock.mockResolvedValue(undefined)
     obtainVersionMock.mockResolvedValue('1.0.0')
     flushTelemetryMock.mockResolvedValue(undefined)
+    withSpanMock.mockImplementation(
+      async (_name: string, _op: string, fn: () => Promise<any>) => fn()
+    )
   })
 
   it('reads option inputs', async () => {
@@ -196,6 +211,50 @@ describe('action', () => {
     await main.run()
     expect(reportErrorMock).toHaveBeenCalled()
     expect(setFailedMock).toHaveBeenCalled()
+  })
+
+  it('should emit start and exit log events', async () => {
+    setupMocks()
+    await main.run({ force: true, installer: 'shell' })
+    expect(logEventMock).toHaveBeenCalledWith(
+      'setup-elide.start',
+      expect.objectContaining({ installer: 'shell' })
+    )
+    expect(logEventMock).toHaveBeenCalledWith(
+      'setup-elide.exit',
+      expect.objectContaining({ status: 'success' })
+    )
+  })
+
+  it('should record install duration metric', async () => {
+    setupMocks()
+    await main.run({ force: true, installer: 'shell' })
+    expect(recordMetricMock).toHaveBeenCalledWith(
+      'setup_elide.duration_ms',
+      expect.any(Number),
+      'millisecond',
+      expect.objectContaining({ installer: 'shell' })
+    )
+  })
+
+  it('should wrap install in tracing spans', async () => {
+    setupMocks()
+    await main.run({ force: true, installer: 'shell' })
+    expect(withSpanMock).toHaveBeenCalledWith(
+      'setup-elide',
+      'setup',
+      expect.any(Function)
+    )
+    expect(withSpanMock).toHaveBeenCalledWith(
+      'install.shell',
+      'install',
+      expect.any(Function)
+    )
+    expect(withSpanMock).toHaveBeenCalledWith(
+      'verify',
+      'verify',
+      expect.any(Function)
+    )
   })
 
   it('should use grouped output', async () => {

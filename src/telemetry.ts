@@ -45,7 +45,6 @@ function scrubEnvVars(input: string): string {
  * Scrub an entire Sentry event of sensitive data.
  */
 function scrubEvent(event: Event): Event {
-  // Strip fields that could leak environment info
   delete event.server_name
   delete event.extra
   delete event.user
@@ -53,7 +52,6 @@ function scrubEvent(event: Event): Event {
   event.contexts = {}
   event.breadcrumbs = []
 
-  // Scrub exception messages of env var values
   if (event.exception?.values) {
     for (const ex of event.exception.values) {
       if (ex.value) {
@@ -62,7 +60,6 @@ function scrubEvent(event: Event): Event {
     }
   }
 
-  // Scrub top-level message
   if (event.message) {
     event.message = scrubEnvVars(event.message)
   }
@@ -72,7 +69,8 @@ function scrubEvent(event: Event): Event {
 
 /**
  * Initialize Sentry telemetry with aggressive scrubbing.
- * No environment data, no PII, no secrets — only the error and action config tags.
+ * Enables error reporting, tracing, and metrics.
+ * No environment data, no PII, no secrets — only the error/span and action config tags.
  */
 export function initTelemetry(
   enabled: boolean,
@@ -86,7 +84,11 @@ export function initTelemetry(
     defaultIntegrations: false,
     environment: options.channel,
     release: `setup-elide@${ACTION_VERSION}`,
+    tracesSampleRate: 1.0,
     beforeSend(event) {
+      return scrubEvent(event)
+    },
+    beforeSendTransaction(event) {
       return scrubEvent(event)
     }
   })
@@ -117,6 +119,47 @@ export function reportError(
       }
     }
     Sentry.captureException(err)
+  })
+}
+
+/**
+ * Run an async function inside a Sentry tracing span.
+ * If telemetry is disabled, runs the function directly.
+ */
+export async function withSpan<T>(
+  name: string,
+  op: string,
+  fn: () => Promise<T>
+): Promise<T> {
+  if (!telemetryEnabled) return fn()
+
+  return Sentry.startSpan(
+    { name, op, attributes: { 'sentry.origin': 'manual' } },
+    async () => fn()
+  )
+}
+
+/**
+ * Record a metric gauge value (e.g., install duration).
+ */
+export function recordMetric(
+  name: string,
+  value: number,
+  unit: string,
+  tags?: Record<string, string>
+): void {
+  if (!telemetryEnabled) return
+  Sentry.metrics.gauge(name, value, { unit, tags })
+}
+
+/**
+ * Log an informational event to Sentry.
+ */
+export function logEvent(message: string, data?: Record<string, string>): void {
+  if (!telemetryEnabled) return
+  Sentry.captureMessage(message, {
+    level: 'info',
+    tags: data
   })
 }
 

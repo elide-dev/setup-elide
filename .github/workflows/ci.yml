@@ -48,12 +48,37 @@ jobs:
 
       - name: Test
         id: test
-        run: bun run test
+        run: bun run test:ci
 
-      - name: "Report: Coverage"
+      - name: "Upload: Test Results"
+        if: ${{ !cancelled() && hashFiles('test-results/**') != '' }}
         uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          report_type: test_results
+          files: test-results/batch1.xml,test-results/batch2.xml,test-results/batch3.xml,test-results/batch4.xml,test-results/batch5.xml,test-results/batch6.xml
+          fail_ci_if_error: false
+
+      - name: "Upload: Coverage"
+        if: ${{ !cancelled() && hashFiles('coverage/**') != '' }}
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: ./coverage
+          files: coverage/lcov.info
+          fail_ci_if_error: false
+
+      - name: Build
+        run: bun run build
+
+      - name: "Upload: Bundle Analysis"
+        if: ${{ !cancelled() }}
+        run: |
+          bun x @codecov/bundle-analyzer ./dist \
+            --bundle-name=setup-elide \
+            --upload-token=${{ secrets.CODECOV_TOKEN }} \
+            --config-file=codecov-bundle.json
+        continue-on-error: true
 
   test-action:
     name: "Test: ${{ matrix.name }}"
