@@ -116,9 +116,9 @@ jobs:
           - name: macos-arm64 (shell)
             runner: macos-latest
             installer: shell
-          - name: macos-arm64 (pkg)
-            runner: macos-latest
-            installer: pkg
+          # - name: macos-arm64 (pkg)
+          #   runner: macos-latest
+          #   installer: pkg
 
           # --- macOS AMD64 ---
           - name: macos-amd64 (archive)
@@ -129,9 +129,9 @@ jobs:
           - name: windows-amd64 (archive)
             runner: windows-latest
             installer: archive
-          - name: windows-amd64 (shell)
-            runner: windows-latest
-            installer: shell
+          # - name: windows-amd64 (shell)
+          #   runner: windows-latest
+          #   installer: shell
           # MSI: suppressed until installer is verified
           # - name: windows-amd64 (msi)
           #   runner: windows-latest
