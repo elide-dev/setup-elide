@@ -63,6 +63,7 @@ inputs:
   token:
     description: 'GitHub Token'
     required: false
+    default: ${{ github.token }}
 
 outputs:
   path:
