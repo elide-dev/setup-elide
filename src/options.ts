@@ -98,9 +98,7 @@ export const defaults: ElideSetupActionOptions = {
 /**
  * Normalize a channel string to a recognized channel token.
  */
-export function normalizeChannel(
-  channel: string
-): ElideChannel {
+export function normalizeChannel(channel: string): ElideChannel {
   switch (channel.trim().toLowerCase()) {
     case 'nightly':
       return 'nightly'
