@@ -3,13 +3,18 @@ import { Octokit } from 'octokit'
 import * as toolCache from '@actions/tool-cache'
 import * as github from '@actions/github'
 import type { ElideSetupActionOptions } from './options'
-import { GITHUB_DEFAULT_HEADERS } from './config'
 import { obtainVersion } from './command'
 import { which, mv } from '@actions/io'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 
 const downloadBase = 'https://elide.zip'
+
+const GITHUB_API_VERSION = '2022-11-28'
+
+const GITHUB_DEFAULT_HEADERS = {
+  'X-GitHub-Api-Version': GITHUB_API_VERSION
+}
 
 /**
  * Version info resolved for a release of Elide.
@@ -112,22 +117,18 @@ export function cdnArch(arch: string): string {
 }
 
 /**
- * Build a download URL for an Elide release; if a custom URL is provided as part of the set of
- * `options`, use it instead.
+ * Build a download URL for an Elide release.
  *
- * @param version Version we are downloading.
  * @param options Effective options.
  * @return URL and archive type to use.
  */
 export async function buildDownloadUrl(
-  options: ElideSetupActionOptions,
-  version: ElideVersionInfo
+  options: ElideSetupActionOptions
 ): Promise<{ url: URL; archiveType: ArchiveType }> {
   let ext = 'tgz'
   let archiveType = ArchiveType.GZIP
   const hasXz = await which('xz')
 
-  /* istanbul ignore next */
   if (options.os === ElideOS.WINDOWS) {
     ext = 'zip'
     archiveType = ArchiveType.ZIP
@@ -181,7 +182,6 @@ async function unpackRelease(
 ): Promise<string> {
   let target: string
   try {
-    /* istanbul ignore next */
     if (options.os === ElideOS.WINDOWS) {
       core.debug(
         `Extracting as zip on Windows, from: ${archive}, to: ${elideHome}`
@@ -192,7 +192,6 @@ async function unpackRelease(
 
       switch (archiveType) {
         // extract as zip
-        /* istanbul ignore next */
         case ArchiveType.ZIP:
           core.debug(
             `Extracting as zip on Unix or Linux, from: ${archive}, to: ${elideHome}`
@@ -255,18 +254,10 @@ async function unpackRelease(
       }
     }
   } catch (err) {
-    /* istanbul ignore next */
     core.warning(`Failed to extract Elide release: ${err}`)
     target = elideHome
   }
 
-  // determine if the archive has a directory root
-  if (
-    resolvedVersion === '1.0.0-alpha7' ||
-    resolvedVersion === '1.0.0-alpha8'
-  ) {
-    return target // no directory root: early release
-  }
   core.debug(`Elide release ${resolvedVersion} extracted at ${target}`)
   return target
 }
@@ -279,7 +270,6 @@ async function unpackRelease(
 export async function resolveLatestVersion(
   token?: string
 ): Promise<ElideVersionInfo> {
-  /* istanbul ignore next */
   const octokit = token ? github.getOctokit(token) : new Octokit({})
   const latest = await octokit.request(
     'GET /repos/{owner}/{repo}/releases/latest',
@@ -290,11 +280,9 @@ export async function resolveLatestVersion(
     }
   )
 
-  /* istanbul ignore next */
   if (!latest) {
     throw new Error('Failed to fetch the latest Elide version')
   }
-  /* istanbul ignore next */
   const name = latest.data?.name || undefined
   return {
     name,
@@ -314,7 +302,7 @@ async function maybeDownload(
   options: ElideSetupActionOptions
 ): Promise<ElideRelease> {
   // build download URL, use result from cache or disk
-  const { url, archiveType } = await buildDownloadUrl(options, version)
+  const { url, archiveType } = await buildDownloadUrl(options)
   const sep = options.os === ElideOS.WINDOWS ? '\\' : '/'
   const binName = options.os === ElideOS.WINDOWS ? 'elide.exe' : 'elide'
   let targetBin = `${options.install_path}${sep}bin${sep}${binName}`
@@ -325,7 +313,6 @@ async function maybeDownload(
 
   // build resulting tarball path and resolved tool info
   let elidePath = targetBin
-  /* istanbul ignore next */
   let elideHome: string = process.env.ELIDE_HOME || options.install_path
   let elidePathTarget = elideHome
   let elideBin: string = `${elideHome}${sep}bin`
@@ -337,10 +324,8 @@ async function maybeDownload(
     )
     elideDir = toolCache.find('elide', version.tag_name, options.arch)
   } catch (err) {
-    /* istanbul ignore next */
     core.debug(`Failed to locate Elide in tool cache: ${err}`)
   }
-  /* istanbul ignore next */
   if (options.no_cache !== true && elideDir) {
     // we have an existing cached copy of elide
     core.debug('Caching enabled and cached Elide release found; using it')
@@ -349,7 +334,6 @@ async function maybeDownload(
     elideBin = `${elideDir}${sep}bin`
     core.info(`Using cached copy of Elide at version ${version.tag_name}`)
   } else {
-    /* istanbul ignore next */
     if (options.no_cache) {
       core.debug(
         'Cache disabled; forcing a fetch of the specified Elide release'
@@ -365,11 +349,8 @@ async function maybeDownload(
     try {
       elideArchive = await toolCache.downloadTool(url.toString())
     } catch (err) {
-      /* istanbul ignore next */
       core.error(`Failed to download Elide release: ${err}`)
-      /* istanbul ignore next */
       if (err instanceof Error) core.setFailed(err)
-      /* istanbul ignore next */
       throw err
     }
 
@@ -429,14 +410,12 @@ export async function downloadRelease(
 
       // sniff archive type from URL
       let archiveType: ArchiveType = ArchiveType.GZIP
-      /* istanbul ignore next */
       if (options.custom_url.endsWith('.txz')) {
         archiveType = ArchiveType.TXZ
       } else if (options.custom_url.endsWith('.zip')) {
         archiveType = ArchiveType.ZIP
       }
 
-      /* istanbul ignore next */
       let elideHome: string = process.env.ELIDE_HOME || options.install_path
       elideHome = await unpackRelease(
         customArchive,
@@ -460,11 +439,8 @@ export async function downloadRelease(
         elidePath
       }
     } catch (err) {
-      /* istanbul ignore next */
       core.error(`Failed to download custom release: ${err}`)
-      /* istanbul ignore next */
       if (err instanceof Error) core.setFailed(err)
-      /* istanbul ignore next */
       throw err
     }
   } else {
@@ -474,7 +450,6 @@ export async function downloadRelease(
       core.debug('Resolving latest version via GitHub API')
       versionInfo = await resolveLatestVersion(options.token)
     } else {
-      /* istanbul ignore next */
       versionInfo = {
         tag_name: options.version,
         userProvided: true

@@ -31,8 +31,7 @@ mock.module('@actions/core', () => ({
 }))
 mock.module('../src/command', () => ({
   obtainVersion: obtainVersionMock,
-  prewarm: jest.fn(),
-  info: jest.fn()
+  elideInfo: jest.fn()
 }))
 
 const { installViaApt } = await import('../src/install-apt')

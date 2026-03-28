@@ -24,7 +24,7 @@ inputs:
     description: 'Architecture'
     required: false
 
-  target:
+  install_path:
     description: 'Custom install path'
     required: false
 
@@ -35,10 +35,19 @@ inputs:
   export_path:
     description: 'Export to Path'
     required: false
-    default: true
+    default: 'true'
+
+  no_cache:
+    description: 'Disable tool caching'
+    required: false
+    default: 'false'
 
   custom_url:
     description: 'Custom Download URL'
+    required: false
+
+  version_tag:
+    description: 'Version tag for custom download URL'
     required: false
 
   token:
@@ -48,6 +57,9 @@ inputs:
 outputs:
   path:
     description: 'Path to Elide'
+
+  version:
+    description: 'Installed Elide version'
 
 runs:
   using: node24
