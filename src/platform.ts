@@ -14,3 +14,18 @@ export async function isDebianLike(): Promise<boolean> {
     return false
   }
 }
+
+/**
+ * Check whether the current system is RPM-based (RHEL, Fedora, CentOS, etc.)
+ * by testing for the presence of `/etc/redhat-release`.
+ *
+ * @return `true` if `/etc/redhat-release` exists.
+ */
+export async function isRpmBased(): Promise<boolean> {
+  try {
+    await access('/etc/redhat-release')
+    return true
+  } catch {
+    return false
+  }
+}

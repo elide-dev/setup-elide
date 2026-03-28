@@ -10,8 +10,14 @@ mock.module('@actions/io', () => ({
   mkdirP: jest.fn()
 }))
 
-const { resolveLatestVersion, buildDownloadUrl, ArchiveType, cdnOs, cdnArch } =
-  await import('../src/releases')
+const {
+  resolveLatestVersion,
+  buildDownloadUrl,
+  buildCdnAssetUrl,
+  ArchiveType,
+  cdnOs,
+  cdnArch
+} = await import('../src/releases')
 const { default: buildOptions } = await import('../src/options')
 
 describe('elide release', () => {
@@ -42,6 +48,45 @@ describe('CDN platform mapping', () => {
   })
 })
 
+describe('buildCdnAssetUrl', () => {
+  it('should append ?source=gha', () => {
+    const options = buildOptions({
+      os: 'linux',
+      arch: 'amd64',
+      version: '1.0.0',
+      channel: 'release'
+    })
+    const url = buildCdnAssetUrl(options, 'tgz')
+    expect(url.toString()).toBe(
+      'https://elide.zip/artifacts/release/1.0.0/elide.linux-amd64.tgz?source=gha'
+    )
+  })
+
+  it('should work for non-archive extensions', () => {
+    const options = buildOptions({
+      os: 'windows',
+      arch: 'amd64',
+      version: '1.0.0',
+      channel: 'release'
+    })
+    expect(buildCdnAssetUrl(options, 'msi').toString()).toBe(
+      'https://elide.zip/artifacts/release/1.0.0/elide.windows-amd64.msi?source=gha'
+    )
+  })
+
+  it('should use latest as revision when version is latest', () => {
+    const options = buildOptions({
+      os: 'darwin',
+      arch: 'aarch64',
+      version: 'latest'
+    })
+    const url = buildCdnAssetUrl(options, 'pkg')
+    expect(url.toString()).toBe(
+      'https://elide.zip/artifacts/nightly/latest/elide.macos-arm64.pkg?source=gha'
+    )
+  })
+})
+
 describe('buildDownloadUrl', () => {
   beforeEach(() => {
     whichMock.mockClear()
@@ -59,7 +104,7 @@ describe('buildDownloadUrl', () => {
     })
     const { url } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
-      'https://elide.zip/artifacts/release/1.0.0/elide.linux-amd64.tgz'
+      'https://elide.zip/artifacts/release/1.0.0/elide.linux-amd64.tgz?source=gha'
     )
   })
 
@@ -72,7 +117,7 @@ describe('buildDownloadUrl', () => {
     })
     const { url } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
-      'https://elide.zip/artifacts/release/1.0.0/elide.macos-arm64.tgz'
+      'https://elide.zip/artifacts/release/1.0.0/elide.macos-arm64.tgz?source=gha'
     )
   })
 
@@ -85,7 +130,7 @@ describe('buildDownloadUrl', () => {
     })
     const { url } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
-      'https://elide.zip/artifacts/release/1.0.0/elide.macos-amd64.tgz'
+      'https://elide.zip/artifacts/release/1.0.0/elide.macos-amd64.tgz?source=gha'
     )
   })
 
@@ -98,7 +143,7 @@ describe('buildDownloadUrl', () => {
     })
     const { url, archiveType } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
-      'https://elide.zip/artifacts/release/1.0.0/elide.windows-amd64.zip'
+      'https://elide.zip/artifacts/release/1.0.0/elide.windows-amd64.zip?source=gha'
     )
     expect(archiveType).toBe(ArchiveType.ZIP)
   })
@@ -114,7 +159,7 @@ describe('buildDownloadUrl', () => {
     })
     const { url } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
-      'https://elide.zip/artifacts/release/1.0.0-beta10/elide.linux-amd64.tgz'
+      'https://elide.zip/artifacts/release/1.0.0-beta10/elide.linux-amd64.tgz?source=gha'
     )
   })
 
@@ -127,7 +172,7 @@ describe('buildDownloadUrl', () => {
     })
     const { url } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
-      'https://elide.zip/artifacts/release/1.0.0-alpha7/elide.macos-arm64.tgz'
+      'https://elide.zip/artifacts/release/1.0.0-alpha7/elide.macos-arm64.tgz?source=gha'
     )
   })
 
@@ -141,7 +186,7 @@ describe('buildDownloadUrl', () => {
     })
     const { url } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
-      'https://elide.zip/artifacts/nightly/1.0.0/elide.linux-amd64.tgz'
+      'https://elide.zip/artifacts/nightly/1.0.0/elide.linux-amd64.tgz?source=gha'
     )
   })
 
@@ -153,7 +198,7 @@ describe('buildDownloadUrl', () => {
     })
     const { url } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
-      'https://elide.zip/artifacts/nightly/latest/elide.linux-amd64.tgz'
+      'https://elide.zip/artifacts/nightly/latest/elide.linux-amd64.tgz?source=gha'
     )
   })
 
@@ -168,7 +213,7 @@ describe('buildDownloadUrl', () => {
     })
     const { url } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
-      'https://elide.zip/artifacts/preview/latest/elide.macos-arm64.tgz'
+      'https://elide.zip/artifacts/preview/latest/elide.macos-arm64.tgz?source=gha'
     )
   })
 
@@ -182,7 +227,7 @@ describe('buildDownloadUrl', () => {
     })
     const { url, archiveType } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
-      'https://elide.zip/artifacts/nightly/latest/elide.windows-amd64.zip'
+      'https://elide.zip/artifacts/nightly/latest/elide.windows-amd64.zip?source=gha'
     )
     expect(archiveType).toBe(ArchiveType.ZIP)
   })
@@ -197,7 +242,7 @@ describe('buildDownloadUrl', () => {
     })
     const { url, archiveType } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
-      'https://elide.zip/artifacts/release/1.0.0/elide.linux-amd64.txz'
+      'https://elide.zip/artifacts/release/1.0.0/elide.linux-amd64.txz?source=gha'
     )
     expect(archiveType).toBe(ArchiveType.TXZ)
   })

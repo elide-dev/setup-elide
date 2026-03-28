@@ -14,7 +14,6 @@ const infoMock = jest.fn()
 const warningMock = jest.fn()
 const errorMock = jest.fn()
 const addPathMock = jest.fn()
-const isDebianLikeMock = jest.fn().mockResolvedValue(false)
 const downloadToolMock = jest.fn().mockResolvedValue('/tmp/install.sh')
 const elideInfoMock = jest.fn().mockResolvedValue(undefined)
 const obtainVersionMock = jest.fn().mockResolvedValue('1.0.0')
@@ -55,9 +54,6 @@ mock.module('../src/command', () => ({
   ElideCommand: { RUN: 'run', INFO: 'info' },
   ElideArgument: { VERSION: '--version' }
 }))
-mock.module('../src/platform', () => ({
-  isDebianLike: isDebianLikeMock
-}))
 
 const main = await import('../src/main')
 const { default: buildOptions, OptionName } = await import('../src/options')
@@ -94,15 +90,11 @@ describe('action', () => {
     warningMock.mockClear()
     errorMock.mockClear()
     addPathMock.mockClear()
-    isDebianLikeMock.mockClear()
     downloadToolMock.mockClear()
     elideInfoMock.mockClear()
     obtainVersionMock.mockClear()
     // Default: getInput returns empty
     getInputMock.mockReturnValue('')
-
-    // Default: not debian
-    isDebianLikeMock.mockResolvedValue(false)
 
     // Default: install script path succeeds
     downloadToolMock.mockResolvedValue('/tmp/install.sh')
@@ -126,6 +118,7 @@ describe('action', () => {
     expect(getInputMock).toHaveBeenCalledWith(OptionName.ARCH)
     expect(getInputMock).toHaveBeenCalledWith(OptionName.TOKEN)
     expect(getInputMock).toHaveBeenCalledWith(OptionName.CUSTOM_URL)
+    expect(getInputMock).toHaveBeenCalledWith(OptionName.INSTALLER)
   })
 
   it('sets the `path` and `version` outputs', async () => {
@@ -164,7 +157,9 @@ describe('action', () => {
     expect(existing).toBeNull()
   })
 
-  it('should be able to force installation', async () => {
+  // --- Installer routing tests ---
+
+  it('should use archive installer by default', async () => {
     setupMocks()
     await main.run({ force: true })
     expect(setFailedMock).not.toHaveBeenCalled()
@@ -172,11 +167,107 @@ describe('action', () => {
       ActionOutputName.PATH,
       expect.anything()
     )
-    expect(setOutputMock).toHaveBeenCalledWith(
-      ActionOutputName.VERSION,
-      expect.anything()
+  })
+
+  it('should use shell installer when specified', async () => {
+    setupMocks()
+    await main.run({ force: true, installer: 'shell' })
+    expect(setFailedMock).not.toHaveBeenCalled()
+    expect(infoMock).toHaveBeenCalledWith(
+      expect.stringContaining('install script')
     )
   })
+
+  it('should use apt installer when specified on linux', async () => {
+    setupMocks()
+    await main.run({
+      force: true,
+      os: 'linux',
+      arch: 'amd64',
+      installer: 'apt'
+    })
+    expect(setFailedMock).not.toHaveBeenCalled()
+    expect(infoMock).toHaveBeenCalledWith(expect.stringContaining('apt'))
+  })
+
+  it('should use archive download for windows with archive installer', async () => {
+    setupMocks()
+    await main.run({
+      force: true,
+      os: 'windows',
+      arch: 'amd64',
+      installer: 'archive'
+    })
+    expect(setFailedMock).not.toHaveBeenCalled()
+  })
+
+  it('should use msi installer on windows', async () => {
+    setupMocks()
+    await main.run({
+      force: true,
+      os: 'windows',
+      arch: 'amd64',
+      installer: 'msi'
+    })
+    expect(setFailedMock).not.toHaveBeenCalled()
+    expect(infoMock).toHaveBeenCalledWith(expect.stringContaining('MSI'))
+  })
+
+  it('should use pkg installer on darwin', async () => {
+    setupMocks()
+    await main.run({
+      force: true,
+      os: 'darwin',
+      arch: 'aarch64',
+      installer: 'pkg'
+    })
+    expect(setFailedMock).not.toHaveBeenCalled()
+    expect(infoMock).toHaveBeenCalledWith(expect.stringContaining('PKG'))
+  })
+
+  it('should use rpm installer on linux', async () => {
+    setupMocks()
+    await main.run({
+      force: true,
+      os: 'linux',
+      arch: 'amd64',
+      installer: 'rpm'
+    })
+    expect(setFailedMock).not.toHaveBeenCalled()
+    expect(infoMock).toHaveBeenCalledWith(expect.stringContaining('RPM'))
+  })
+
+  // --- Validation fallback ---
+
+  it('should warn and fall back to archive for invalid installer/platform combo', async () => {
+    setupMocks()
+    await main.run({
+      force: true,
+      os: 'linux',
+      arch: 'amd64',
+      installer: 'msi'
+    })
+    expect(warningMock).toHaveBeenCalledWith(
+      expect.stringContaining("Installer 'msi' is not supported on linux")
+    )
+    expect(setFailedMock).not.toHaveBeenCalled()
+  })
+
+  it('should warn and fall back for pkg on linux', async () => {
+    setupMocks()
+    await main.run({
+      force: true,
+      os: 'linux',
+      arch: 'amd64',
+      installer: 'pkg'
+    })
+    expect(warningMock).toHaveBeenCalledWith(
+      expect.stringContaining("Installer 'pkg' is not supported on linux")
+    )
+    expect(setFailedMock).not.toHaveBeenCalled()
+  })
+
+  // --- Existing behavior preserved ---
 
   it('should be able to force installation of specific version', async () => {
     setupMocks()
@@ -220,34 +311,15 @@ describe('action', () => {
     )
   })
 
-  it('should install via apt when on debian-like linux', async () => {
-    setupMocks()
-    isDebianLikeMock.mockResolvedValue(true)
-    await main.run({ force: true, os: 'linux', arch: 'amd64' })
-    expect(infoMock).toHaveBeenCalledWith(
-      expect.stringContaining('apt repository')
-    )
-    expect(setFailedMock).not.toHaveBeenCalled()
-  })
-
   it('should warn on version mismatch', async () => {
     setupMocks()
-    // First call (inside installViaScript) returns the "installed" version,
+    // First call (inside installViaShell) returns '1.0.0' as the installed version,
     // second call (main.run verification) returns a different version.
     obtainVersionMock.mockResolvedValueOnce('1.0.0').mockResolvedValue('9.9.9')
-    await main.run({ force: true })
+    await main.run({ force: true, installer: 'shell' })
     expect(warningMock).toHaveBeenCalledWith(
       expect.stringContaining('Elide version mismatch')
     )
-  })
-
-  it('should use archive download for windows', async () => {
-    setupMocks()
-    await main.run({ force: true, os: 'windows', arch: 'amd64' })
-    expect(infoMock).toHaveBeenCalledWith(
-      expect.stringContaining('Windows -- installing via archive')
-    )
-    expect(setFailedMock).not.toHaveBeenCalled()
   })
 
   it('should use downloadRelease for custom_url', async () => {

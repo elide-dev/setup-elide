@@ -12,13 +12,16 @@ export enum ActionOutputName {
 
 import buildOptions, {
   ElideSetupActionOptions,
-  buildOptionsFromInputs
+  buildOptionsFromInputs,
+  validateInstallerForPlatform
 } from './options'
 
 import { downloadRelease, ElideRelease } from './releases'
-import { isDebianLike } from './platform'
 import { installViaApt } from './install-apt'
-import { installViaScript } from './install-script'
+import { installViaShell } from './install-shell'
+import { installViaMsi } from './install-msi'
+import { installViaPkg } from './install-pkg'
+import { installViaRpm } from './install-rpm'
 
 export function notSupported(options: ElideSetupActionOptions): null | Error {
   const spec = `${options.os}-${options.arch}`
@@ -98,26 +101,44 @@ export async function run(
       }
     }
 
-    // choose installation method based on platform
+    // validate installer for platform, fall back to archive with warning
+    let installer = effectiveOptions.installer
+    const validation = validateInstallerForPlatform(
+      installer,
+      effectiveOptions.os
+    )
+    if (!validation.valid) {
+      core.warning(
+        `Installer '${installer}' is not supported on ${effectiveOptions.os}: ${validation.reason}. Falling back to 'archive'.`
+      )
+      installer = 'archive'
+    }
+
+    // choose installation method
     let release: ElideRelease
     if (effectiveOptions.custom_url) {
-      // custom URL always uses the tarball download path
       release = await downloadRelease(effectiveOptions)
-    } else if (effectiveOptions.os === 'linux' && (await isDebianLike())) {
-      core.info('Detected Debian/Ubuntu -- installing via apt repository')
-      release = await installViaApt(effectiveOptions)
-    } else if (effectiveOptions.os === 'windows') {
-      core.info('Detected Windows -- installing via archive download')
-      release = await downloadRelease(effectiveOptions)
-    } else if (
-      effectiveOptions.os === 'linux' ||
-      effectiveOptions.os === 'darwin'
-    ) {
-      core.info('Installing via install script')
-      release = await installViaScript(effectiveOptions)
     } else {
-      // Unknown platform: fall back to archive download
-      release = await downloadRelease(effectiveOptions)
+      switch (installer) {
+        case 'archive':
+          release = await downloadRelease(effectiveOptions)
+          break
+        case 'shell':
+          release = await installViaShell(effectiveOptions)
+          break
+        case 'msi':
+          release = await installViaMsi(effectiveOptions)
+          break
+        case 'pkg':
+          release = await installViaPkg(effectiveOptions)
+          break
+        case 'apt':
+          release = await installViaApt(effectiveOptions)
+          break
+        case 'rpm':
+          release = await installViaRpm(effectiveOptions)
+          break
+      }
     }
     core.debug(`Release version: '${release.version.tag_name}'`)
 

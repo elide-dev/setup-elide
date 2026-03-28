@@ -24,6 +24,11 @@ inputs:
     description: 'Architecture'
     required: false
 
+  installer:
+    description: 'Installation method: archive, shell, msi, pkg, apt, or rpm'
+    required: false
+    default: 'archive'
+
   install_path:
     description: 'Custom install path'
     required: false
