@@ -1,71 +1,24 @@
 import * as core from '@actions/core'
 import * as io from '@actions/io'
-import { ActionOutputName, ElideSetupActionOutputs } from './outputs'
-import { prewarm, info, obtainVersion } from './command'
+import { elideInfo, obtainVersion } from './command'
+
+/**
+ * Enumerates outputs and maps them to their well-known names.
+ */
+export enum ActionOutputName {
+  PATH = 'path',
+  VERSION = 'version'
+}
 
 import buildOptions, {
-  OptionName,
   ElideSetupActionOptions,
-  defaults,
-  normalizeOs,
-  normalizeArch,
-  normalizeChannel
+  buildOptionsFromInputs
 } from './options'
 
 import { downloadRelease, ElideRelease } from './releases'
 import { isDebianLike } from './platform'
 import { installViaApt } from './install-apt'
 import { installViaScript } from './install-script'
-
-function stringOption(
-  option: string,
-  defaultValue?: string
-): string | undefined {
-  const value: string = core.getInput(option)
-  core.debug(`Property value: ${option}=${value || defaultValue}`)
-  return value || defaultValue || undefined
-}
-
-function getBooleanOption(booleanInputName: string): boolean {
-  const trueValue = [
-    'true',
-    'True',
-    'TRUE',
-    'yes',
-    'Yes',
-    'YES',
-    'y',
-    'Y',
-    'on',
-    'On',
-    'ON'
-  ]
-  const falseValue = [
-    'false',
-    'False',
-    'FALSE',
-    'no',
-    'No',
-    'NO',
-    'n',
-    'N',
-    'off',
-    'Off',
-    'OFF'
-  ]
-  const stringInput = core.getInput(booleanInputName)
-  /* istanbul ignore next */
-  if (trueValue.includes(stringInput)) return true
-  /* istanbul ignore next */
-  if (falseValue.includes(stringInput)) return false
-  return false // default to `false`
-}
-
-function booleanOption(option: string, defaultValue: boolean): boolean {
-  const value: boolean = getBooleanOption(option)
-  /* istanbul ignore next */
-  return value !== null && value !== undefined ? value : defaultValue
-}
 
 export function notSupported(options: ElideSetupActionOptions): null | Error {
   const spec = `${options.os}-${options.arch}`
@@ -82,24 +35,12 @@ export function notSupported(options: ElideSetupActionOptions): null | Error {
   }
 }
 
-export async function postInstall(
-  bin: string,
-  options: ElideSetupActionOptions
-): Promise<void> {
-  if (options.prewarm) {
-    try {
-      await prewarm(bin)
-    } catch (err) {
-      core.debug(
-        `Prewarm failed; proceeding anyway. Error: ${err instanceof Error ? err.message : err}`
-      )
-    }
-  }
+export async function postInstall(bin: string): Promise<void> {
   try {
-    await info(bin)
+    await elideInfo(bin)
   } catch (err) {
     core.debug(
-      `Info command failed; proceeding anyway. Error: ${err instanceof Error ? err.message : err}`
+      `Post-install info failed; proceeding anyway. Error: ${err instanceof Error ? err.message : err}`
     )
   }
 }
@@ -121,31 +62,10 @@ export async function run(
   options?: Partial<ElideSetupActionOptions>
 ): Promise<void> {
   try {
-    // resolve effective plugin options
     core.info('Installing Elide with GitHub Actions')
     const effectiveOptions: ElideSetupActionOptions = options
       ? buildOptions(options)
-      : buildOptions({
-          version: stringOption(OptionName.VERSION, 'latest'),
-          install_path: stringOption(
-            OptionName.INSTALL_PATH,
-            /* istanbul ignore next */
-            process.env.ELIDE_HOME || defaults.install_path
-          ),
-          os: normalizeOs(
-            stringOption(OptionName.OS, process.platform) as string
-          ),
-          arch: normalizeArch(
-            stringOption(OptionName.ARCH, process.arch) as string
-          ),
-          channel: normalizeChannel(
-            stringOption(OptionName.CHANNEL, 'nightly') as string
-          ),
-          export_path: booleanOption(OptionName.EXPORT_PATH, true),
-          token: stringOption(OptionName.TOKEN, process.env.GITHUB_TOKEN),
-          custom_url: stringOption(OptionName.CUSTOM_URL),
-          version_tag: stringOption(OptionName.VERSION_TAG)
-        })
+      : buildOptionsFromInputs()
 
     // make sure the requested version, platform, and os triple is supported
     const supportErr = notSupported(effectiveOptions)
@@ -161,10 +81,9 @@ export async function run(
         core.debug(
           `Located existing Elide binary at: '${existing}'. Obtaining version...`
         )
-        await postInstall(existing, effectiveOptions)
+        await postInstall(existing)
         const version = await obtainVersion(existing)
 
-        /* istanbul ignore next */
         if (
           version === effectiveOptions.version ||
           effectiveOptions.version === 'local'
@@ -208,14 +127,8 @@ export async function run(
       core.addPath(release.elideBin)
     }
 
-    // begin preparing outputs
-    const outputs: ElideSetupActionOutputs = {
-      path: release.elidePath,
-      version: effectiveOptions.version
-    }
-
     // verify installed version
-    await postInstall(release.elidePath, effectiveOptions)
+    await postInstall(release.elidePath)
     const version = await obtainVersion(release.elidePath)
 
     const isNightly = release.version.tag_name.startsWith('nightly-')
@@ -225,8 +138,8 @@ export async function run(
       )
     }
 
-    // mount outputs
-    core.setOutput(ActionOutputName.PATH, outputs.path)
+    // set outputs
+    core.setOutput(ActionOutputName.PATH, release.elidePath)
     core.setOutput(ActionOutputName.VERSION, version)
     core.info(`Elide installed at version ${release.version.tag_name}`)
   } catch (error) {

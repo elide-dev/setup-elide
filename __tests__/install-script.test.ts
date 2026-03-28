@@ -40,8 +40,7 @@ mock.module('@actions/tool-cache', () => ({
 }))
 mock.module('../src/command', () => ({
   obtainVersion: obtainVersionMock,
-  prewarm: jest.fn(),
-  info: jest.fn()
+  elideInfo: jest.fn()
 }))
 
 const { installViaScript } = await import('../src/install-script')

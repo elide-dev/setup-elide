@@ -25,24 +25,14 @@ export enum ElideArgument {
 }
 
 /**
- * Prewarm the provided Elide binary by running a small script.
- *
- * @param bin Path to the Elide binary.
- * @return Promise which resolves when finished.
- */
-export async function prewarm(bin: string): Promise<void> {
-  core.info(`Prewarming Elide at bin: ${bin}`)
-  return execElide(bin, [ElideCommand.INFO])
-}
-
-/**
  * Print info about the specified Elide runtime binary.
+ * Also serves as a prewarm step (the info command exercises the runtime).
  *
  * @param bin Path to the Elide binary.
  * @return Promise which resolves when finished.
  */
-export async function info(bin: string): Promise<void> {
-  core.debug(`Printing runtime info at bin: ${bin}`)
+export async function elideInfo(bin: string): Promise<void> {
+  core.info(`Running Elide info at bin: ${bin}`)
   return execElide(bin, [ElideCommand.INFO])
 }
 

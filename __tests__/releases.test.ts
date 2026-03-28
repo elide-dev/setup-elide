@@ -57,10 +57,7 @@ describe('buildDownloadUrl', () => {
       version: '1.0.0',
       channel: 'release'
     })
-    const { url } = await buildDownloadUrl(options, {
-      tag_name: '1.0.0',
-      userProvided: true
-    })
+    const { url } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/release/1.0.0/elide.linux-amd64.tgz'
     )
@@ -73,10 +70,7 @@ describe('buildDownloadUrl', () => {
       version: '1.0.0',
       channel: 'release'
     })
-    const { url } = await buildDownloadUrl(options, {
-      tag_name: '1.0.0',
-      userProvided: true
-    })
+    const { url } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/release/1.0.0/elide.macos-arm64.tgz'
     )
@@ -89,10 +83,7 @@ describe('buildDownloadUrl', () => {
       version: '1.0.0',
       channel: 'release'
     })
-    const { url } = await buildDownloadUrl(options, {
-      tag_name: '1.0.0',
-      userProvided: true
-    })
+    const { url } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/release/1.0.0/elide.macos-amd64.tgz'
     )
@@ -105,10 +96,7 @@ describe('buildDownloadUrl', () => {
       version: '1.0.0',
       channel: 'release'
     })
-    const { url, archiveType } = await buildDownloadUrl(options, {
-      tag_name: '1.0.0',
-      userProvided: true
-    })
+    const { url, archiveType } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/release/1.0.0/elide.windows-amd64.zip'
     )
@@ -124,10 +112,7 @@ describe('buildDownloadUrl', () => {
       version: '1.0.0-beta10',
       channel: 'release'
     })
-    const { url } = await buildDownloadUrl(options, {
-      tag_name: '1.0.0-beta10',
-      userProvided: true
-    })
+    const { url } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/release/1.0.0-beta10/elide.linux-amd64.tgz'
     )
@@ -140,10 +125,7 @@ describe('buildDownloadUrl', () => {
       version: '1.0.0-alpha7',
       channel: 'release'
     })
-    const { url } = await buildDownloadUrl(options, {
-      tag_name: '1.0.0-alpha7',
-      userProvided: true
-    })
+    const { url } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/release/1.0.0-alpha7/elide.macos-arm64.tgz'
     )
@@ -157,10 +139,7 @@ describe('buildDownloadUrl', () => {
       arch: 'amd64',
       version: '1.0.0'
     })
-    const { url } = await buildDownloadUrl(options, {
-      tag_name: '1.0.0',
-      userProvided: true
-    })
+    const { url } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/nightly/1.0.0/elide.linux-amd64.tgz'
     )
@@ -172,10 +151,7 @@ describe('buildDownloadUrl', () => {
       arch: 'amd64',
       version: 'latest'
     })
-    const { url } = await buildDownloadUrl(options, {
-      tag_name: 'ignored',
-      userProvided: false
-    })
+    const { url } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/nightly/latest/elide.linux-amd64.tgz'
     )
@@ -190,10 +166,7 @@ describe('buildDownloadUrl', () => {
       version: 'latest',
       channel: 'preview'
     })
-    const { url } = await buildDownloadUrl(options, {
-      tag_name: 'ignored',
-      userProvided: false
-    })
+    const { url } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/preview/latest/elide.macos-arm64.tgz'
     )
@@ -207,10 +180,7 @@ describe('buildDownloadUrl', () => {
       arch: 'amd64',
       version: 'latest'
     })
-    const { url, archiveType } = await buildDownloadUrl(options, {
-      tag_name: 'ignored',
-      userProvided: false
-    })
+    const { url, archiveType } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/nightly/latest/elide.windows-amd64.zip'
     )
@@ -225,10 +195,7 @@ describe('buildDownloadUrl', () => {
       version: '1.0.0',
       channel: 'release'
     })
-    const { url, archiveType } = await buildDownloadUrl(options, {
-      tag_name: '1.0.0',
-      userProvided: true
-    })
+    const { url, archiveType } = await buildDownloadUrl(options)
     expect(url.toString()).toBe(
       'https://elide.zip/artifacts/release/1.0.0/elide.linux-amd64.txz'
     )

@@ -60,7 +60,7 @@
     "package": "bun build src/index.ts --outdir=dist --target=node --minify --sourcemap=linked",
     "package:watch": "bun build src/index.ts --outdir=dist --target=node --sourcemap=linked --watch",
     "test": "bun test __tests__/options.test.ts __tests__/platform.test.ts __tests__/releases.test.ts __tests__/index.test.ts && bun test __tests__/command.test.ts && bun test __tests__/releases-download.test.ts && bun test __tests__/install-apt.test.ts __tests__/install-script.test.ts __tests__/main.test.ts",
-    "test:docker": "docker build -t setup-elide-test . && docker run --rm setup-elide-test sh -c 'bun run build && bun test'",
+    "test:docker": "docker build -t setup-elide-test . && docker run --rm setup-elide-test sh -c 'bun run build && bun run test'",
     "all": "bun run format:write && bun run build && bun run test"
   },
   "license": "MIT",

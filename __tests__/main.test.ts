@@ -16,8 +16,7 @@ const errorMock = jest.fn()
 const addPathMock = jest.fn()
 const isDebianLikeMock = jest.fn().mockResolvedValue(false)
 const downloadToolMock = jest.fn().mockResolvedValue('/tmp/install.sh')
-const prewarmMock = jest.fn().mockResolvedValue(undefined)
-const cmdInfoMock = jest.fn().mockResolvedValue(undefined)
+const elideInfoMock = jest.fn().mockResolvedValue(undefined)
 const obtainVersionMock = jest.fn().mockResolvedValue('1.0.0')
 
 // Mock modules before any project imports
@@ -38,6 +37,7 @@ mock.module('@actions/core', () => ({
   error: errorMock,
   warning: warningMock,
   getInput: getInputMock,
+  getBooleanInput: jest.fn().mockReturnValue(true),
   setFailed: setFailedMock,
   setOutput: setOutputMock,
   addPath: addPathMock
@@ -50,8 +50,7 @@ mock.module('@actions/tool-cache', () => ({
   find: jest.fn()
 }))
 mock.module('../src/command', () => ({
-  prewarm: prewarmMock,
-  info: cmdInfoMock,
+  elideInfo: elideInfoMock,
   obtainVersion: obtainVersionMock,
   ElideCommand: { RUN: 'run', INFO: 'info' },
   ElideArgument: { VERSION: '--version' }
@@ -63,7 +62,7 @@ mock.module('../src/platform', () => ({
 const main = await import('../src/main')
 const { default: buildOptions, OptionName } = await import('../src/options')
 const { ElideArch, ElideOS } = await import('../src/releases')
-const { ActionOutputName } = await import('../src/outputs')
+const { ActionOutputName } = await import('../src/main')
 
 const setupMocks = () => {
   debugMock.mockImplementation((...args: unknown[]) =>
@@ -97,8 +96,7 @@ describe('action', () => {
     addPathMock.mockClear()
     isDebianLikeMock.mockClear()
     downloadToolMock.mockClear()
-    prewarmMock.mockClear()
-    cmdInfoMock.mockClear()
+    elideInfoMock.mockClear()
     obtainVersionMock.mockClear()
     // Default: getInput returns empty
     getInputMock.mockReturnValue('')
@@ -115,8 +113,7 @@ describe('action', () => {
       stderr: '',
       exitCode: 0
     })
-    prewarmMock.mockResolvedValue(undefined)
-    cmdInfoMock.mockResolvedValue(undefined)
+    elideInfoMock.mockResolvedValue(undefined)
     obtainVersionMock.mockResolvedValue('1.0.0')
   })
 
@@ -129,7 +126,6 @@ describe('action', () => {
     expect(getInputMock).toHaveBeenCalledWith(OptionName.ARCH)
     expect(getInputMock).toHaveBeenCalledWith(OptionName.TOKEN)
     expect(getInputMock).toHaveBeenCalledWith(OptionName.CUSTOM_URL)
-    expect(getInputMock).toHaveBeenCalledWith(OptionName.EXPORT_PATH)
   })
 
   it('sets the `path` and `version` outputs', async () => {
@@ -196,23 +192,13 @@ describe('action', () => {
     )
   })
 
-  it('should gracefully handle prewarm failure', async () => {
+  it('should gracefully handle post-install info failure', async () => {
     setupMocks()
-    prewarmMock.mockRejectedValueOnce(new Error('prewarm boom'))
+    elideInfoMock.mockRejectedValueOnce(new Error('info boom'))
     await main.run({ force: true })
     expect(setFailedMock).not.toHaveBeenCalled()
     expect(debugMock).toHaveBeenCalledWith(
-      expect.stringContaining('Prewarm failed; proceeding anyway')
-    )
-  })
-
-  it('should gracefully handle info command failure', async () => {
-    setupMocks()
-    cmdInfoMock.mockRejectedValue(new Error('info boom'))
-    await main.run({ force: true })
-    expect(setFailedMock).not.toHaveBeenCalled()
-    expect(debugMock).toHaveBeenCalledWith(
-      expect.stringContaining('Info command failed; proceeding anyway')
+      expect.stringContaining('Post-install info failed; proceeding anyway')
     )
   })
 

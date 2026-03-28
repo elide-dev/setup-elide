@@ -53,8 +53,7 @@ mock.module('octokit', () => ({
 }))
 mock.module('../src/command', () => ({
   obtainVersion: obtainVersionMock,
-  prewarm: jest.fn(),
-  info: jest.fn()
+  elideInfo: jest.fn()
 }))
 
 const { downloadRelease, resolveLatestVersion } = await import(
@@ -414,16 +413,5 @@ describe('downloadRelease', () => {
       expect(downloadToolMock).toHaveBeenCalled()
       expect(findMock).toHaveBeenCalledWith('elide', '1.0.0', 'aarch64')
     })
-  })
-
-  it('should not wrap with directory root for alpha7/alpha8', async () => {
-    const options = buildOptions({
-      os: 'linux',
-      arch: 'amd64',
-      version: '1.0.0-alpha7'
-    })
-    const result = await downloadRelease(options)
-    // alpha7 has the early-return path in unpackRelease
-    expect(result).toBeDefined()
   })
 })

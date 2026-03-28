@@ -1,5 +1,6 @@
 import os from 'node:os'
 import path from 'node:path'
+import * as core from '@actions/core'
 
 /**
  * Enumerates options and maps them to their well-known option names.
@@ -14,7 +15,8 @@ export enum OptionName {
   VERSION_TAG = 'version_tag',
   TOKEN = 'token',
   INSTALL_PATH = 'install_path',
-  FORCE = 'force'
+  FORCE = 'force',
+  NO_CACHE = 'no_cache'
 }
 
 /**
@@ -48,9 +50,6 @@ export interface ElideSetupActionOptions {
   // Whether to force installation if a copy of Elide is already installed.
   force: boolean
 
-  // Whether to pre-warm the installed copy of Elide; defaults to `true`.
-  prewarm: boolean
-
   // Custom download URL to use in place of interpreted download URLs.
   custom_url?: string
 
@@ -76,7 +75,6 @@ export const nixDefaultPath = path.resolve(os.homedir(), 'elide')
  */
 export const configPath = path.resolve(os.homedir(), '.elide')
 
-/* istanbul ignore next */
 const defaultTargetPath =
   process.platform === 'win32' ? windowsDefaultPath : nixDefaultPath
 
@@ -89,7 +87,6 @@ export const defaults: ElideSetupActionOptions = {
   no_cache: false,
   export_path: true,
   force: false,
-  prewarm: true,
   os: normalizeOs(process.platform),
   arch: normalizeArch(process.arch),
   install_path: defaultTargetPath
@@ -135,7 +132,6 @@ export function normalizeOs(os: string): 'darwin' | 'windows' | 'linux' {
     case 'linux':
       return 'linux'
   }
-  /* istanbul ignore next */
   throw new Error(`Unrecognized OS: ${os}`)
 }
 
@@ -158,7 +154,6 @@ export function normalizeArch(arch: string): 'amd64' | 'aarch64' {
     case 'arm64':
       return 'aarch64'
   }
-  /* istanbul ignore next */
   throw new Error(`Unrecognized architecture: ${arch}`)
 }
 
@@ -178,4 +173,41 @@ export default function buildOptions(
     os: normalizeOs(opts?.os || defaults.os),
     arch: normalizeArch(opts?.arch || defaults.arch)
   } satisfies ElideSetupActionOptions
+}
+
+function stringInput(name: string, defaultValue?: string): string | undefined {
+  const value = core.getInput(name)
+  core.debug(`Input: ${name}=${value || defaultValue}`)
+  return value || defaultValue || undefined
+}
+
+function booleanInput(name: string, defaultValue: boolean): boolean {
+  try {
+    return core.getBooleanInput(name)
+  } catch {
+    return defaultValue
+  }
+}
+
+/**
+ * Build action options by reading GitHub Actions inputs via core.getInput.
+ */
+export function buildOptionsFromInputs(): ElideSetupActionOptions {
+  return buildOptions({
+    version: stringInput(OptionName.VERSION, 'latest'),
+    install_path: stringInput(
+      OptionName.INSTALL_PATH,
+      process.env.ELIDE_HOME || defaults.install_path
+    ),
+    os: normalizeOs(stringInput(OptionName.OS, process.platform) as string),
+    arch: normalizeArch(stringInput(OptionName.ARCH, process.arch) as string),
+    channel: normalizeChannel(
+      stringInput(OptionName.CHANNEL, 'nightly') as string
+    ),
+    export_path: booleanInput(OptionName.EXPORT_PATH, true),
+    no_cache: booleanInput(OptionName.NO_CACHE, false),
+    token: stringInput(OptionName.TOKEN, process.env.GITHUB_TOKEN),
+    custom_url: stringInput(OptionName.CUSTOM_URL),
+    version_tag: stringInput(OptionName.VERSION_TAG)
+  })
 }

@@ -22,8 +22,9 @@ mock.module('@actions/core', () => ({
   addPath: jest.fn()
 }))
 
-const { prewarm, info, obtainVersion, ElideCommand, ElideArgument } =
-  await import('../src/command')
+const { elideInfo, obtainVersion, ElideCommand, ElideArgument } = await import(
+  '../src/command'
+)
 
 describe('command', () => {
   beforeEach(() => {
@@ -39,20 +40,10 @@ describe('command', () => {
     })
   })
 
-  it('prewarm should execute the info command', async () => {
-    await prewarm('/usr/bin/elide')
+  it('elideInfo should execute the info command', async () => {
+    await elideInfo('/usr/bin/elide')
     expect(infoMock).toHaveBeenCalledWith(
-      'Prewarming Elide at bin: /usr/bin/elide'
-    )
-    expect(execMock).toHaveBeenCalledWith('"/usr/bin/elide"', [
-      ElideCommand.INFO
-    ])
-  })
-
-  it('info should execute the info command', async () => {
-    await info('/usr/bin/elide')
-    expect(debugMock).toHaveBeenCalledWith(
-      'Printing runtime info at bin: /usr/bin/elide'
+      'Running Elide info at bin: /usr/bin/elide'
     )
     expect(execMock).toHaveBeenCalledWith('"/usr/bin/elide"', [
       ElideCommand.INFO
@@ -82,8 +73,8 @@ describe('command', () => {
     expect(version).toBe('1.0.0')
   })
 
-  it('prewarm should propagate exec errors', async () => {
+  it('elideInfo should propagate exec errors', async () => {
     execMock.mockRejectedValue(new Error('exec failed'))
-    await expect(prewarm('/bad/path')).rejects.toThrow('exec failed')
+    await expect(elideInfo('/bad/path')).rejects.toThrow('exec failed')
   })
 })
