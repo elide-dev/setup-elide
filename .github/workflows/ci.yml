@@ -62,16 +62,55 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: linux-amd64
+          # --- Linux AMD64 ---
+          - name: linux-amd64 (archive)
             runner: ubuntu-latest
-          - name: linux-arm64
+            installer: archive
+          - name: linux-amd64 (shell)
+            runner: ubuntu-latest
+            installer: shell
+          - name: linux-amd64 (apt)
+            runner: ubuntu-latest
+            installer: apt
+          # - name: linux-amd64 (rpm)
+          #   runner: ubuntu-latest
+          #   installer: rpm
+
+          # --- Linux ARM64 ---
+          - name: linux-arm64 (archive)
             runner: ubuntu-24.04-arm
-          - name: macos-arm64
+            installer: archive
+          - name: linux-arm64 (shell)
+            runner: ubuntu-24.04-arm
+            installer: shell
+
+          # --- macOS ARM64 ---
+          - name: macos-arm64 (archive)
             runner: macos-latest
-          - name: macos-amd64
+            installer: archive
+          - name: macos-arm64 (shell)
+            runner: macos-latest
+            installer: shell
+          - name: macos-arm64 (pkg)
+            runner: macos-latest
+            installer: pkg
+
+          # --- macOS AMD64 ---
+          - name: macos-amd64 (archive)
             runner: macos-15-intel
-          - name: windows-amd64
+            installer: archive
+
+          # --- Windows AMD64 ---
+          - name: windows-amd64 (archive)
             runner: windows-latest
+            installer: archive
+          - name: windows-amd64 (shell)
+            runner: windows-latest
+            installer: shell
+          # MSI: suppressed until installer is verified
+          # - name: windows-amd64 (msi)
+          #   runner: windows-latest
+          #   installer: msi
 
     steps:
       - name: Harden Runner
@@ -86,7 +125,8 @@ jobs:
       - name: "Test: Local Action"
         id: test-action
         uses: ./
-        with: {}
+        with:
+          installer: ${{ matrix.installer }}
 
       - name: "Test: Verify Installation"
         shell: bash
@@ -94,3 +134,5 @@ jobs:
           elide --version
           echo "Path: ${{ steps.test-action.outputs.path }}"
           echo "Version: ${{ steps.test-action.outputs.version }}"
+          echo "Cached: ${{ steps.test-action.outputs.cached }}"
+          echo "Installer: ${{ steps.test-action.outputs.installer }}"

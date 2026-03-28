@@ -47,6 +47,11 @@ inputs:
     required: false
     default: 'false'
 
+  telemetry:
+    description: 'Enable anonymous error telemetry'
+    required: false
+    default: 'true'
+
   custom_url:
     description: 'Custom Download URL'
     required: false
@@ -66,6 +71,14 @@ outputs:
   version:
     description: 'Installed Elide version'
 
+  cached:
+    description: 'Whether a cached installation was used'
+
+  installer:
+    description: 'Effective installer method used'
+
 runs:
   using: node24
   main: dist/index.js
+  post: dist/post.js
+  post-if: always()
