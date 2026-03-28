@@ -267,33 +267,70 @@ async function unpackRelease(
   return target
 }
 
+const MAX_RETRIES = 3
+const RETRY_DELAY_MS = 1000
+
 /**
- * Fetch the latest Elide release from GitHub.
+ * Fetch the latest Elide release from GitHub, with retry on transient failures.
  *
  * @param token GitHub token active for this workflow step.
  */
 export async function resolveLatestVersion(
   token?: string
 ): Promise<ElideVersionInfo> {
+  if (!token) {
+    core.warning(
+      'No GitHub token provided. API requests may be rate-limited. ' +
+        'Set the `token` input or ensure GITHUB_TOKEN is available.'
+    )
+  }
   const octokit = token ? github.getOctokit(token) : new Octokit({})
-  const latest = await octokit.request(
-    'GET /repos/{owner}/{repo}/releases/latest',
-    {
-      owner: 'elide-dev',
-      repo: 'elide',
-      headers: GITHUB_DEFAULT_HEADERS
-    }
-  )
 
-  if (!latest) {
-    throw new Error('Failed to fetch the latest Elide version')
+  let lastError: Error | undefined
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const latest = await octokit.request(
+        'GET /repos/{owner}/{repo}/releases/latest',
+        {
+          owner: 'elide-dev',
+          repo: 'elide',
+          headers: GITHUB_DEFAULT_HEADERS
+        }
+      )
+
+      if (!latest) {
+        throw new Error('Failed to fetch the latest Elide version')
+      }
+      const name = latest.data?.name || undefined
+      return {
+        name,
+        tag_name: latest.data.tag_name,
+        userProvided: !!token
+      }
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err))
+      const isRateLimit =
+        lastError.message.includes('rate limit') ||
+        lastError.message.includes('quota exhausted') ||
+        lastError.message.includes('403') ||
+        lastError.message.includes('429')
+
+      if (attempt < MAX_RETRIES) {
+        const delay = RETRY_DELAY_MS * attempt
+        core.warning(
+          `GitHub API request failed (attempt ${attempt}/${MAX_RETRIES}): ${lastError.message}. Retrying in ${delay}ms...`
+        )
+        await new Promise(resolve => setTimeout(resolve, delay))
+      } else if (isRateLimit) {
+        core.error(
+          'GitHub API rate limit exhausted. Provide a token via the `token` input to increase the limit.',
+          { title: 'Rate Limited' }
+        )
+      }
+    }
   }
-  const name = latest.data?.name || undefined
-  return {
-    name,
-    tag_name: latest.data.tag_name,
-    userProvided: !!token
-  }
+
+  throw lastError!
 }
 
 /**

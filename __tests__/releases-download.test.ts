@@ -83,6 +83,37 @@ describe('resolveLatestVersion', () => {
     expect(getOctokitMock).toHaveBeenCalledWith('ghp_test_token')
     expect(result.userProvided).toBe(true)
   })
+
+  it('should retry on transient failure and succeed', async () => {
+    requestMock
+      .mockRejectedValueOnce(new Error('rate limit exceeded'))
+      .mockResolvedValueOnce({
+        data: { tag_name: '2.0.0', name: 'Elide 2.0.0' }
+      })
+    const result = await resolveLatestVersion()
+    expect(result.tag_name).toBe('2.0.0')
+    expect(requestMock).toHaveBeenCalledTimes(2)
+    expect(warningMock).toHaveBeenCalledWith(
+      expect.stringContaining('Retrying')
+    )
+  })
+
+  it('should throw after exhausting retries', async () => {
+    requestMock.mockRejectedValue(new Error('quota exhausted'))
+    await expect(resolveLatestVersion()).rejects.toThrow('quota exhausted')
+    expect(requestMock).toHaveBeenCalledTimes(3)
+    expect(errorMock).toHaveBeenCalledWith(
+      expect.stringContaining('rate limit'),
+      expect.objectContaining({ title: 'Rate Limited' })
+    )
+  })
+
+  it('should warn when no token is provided', async () => {
+    await resolveLatestVersion()
+    expect(warningMock).toHaveBeenCalledWith(
+      expect.stringContaining('No GitHub token provided')
+    )
+  })
 })
 
 describe('downloadRelease', () => {
