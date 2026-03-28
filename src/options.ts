@@ -16,21 +16,39 @@ export enum OptionName {
   TOKEN = 'token',
   INSTALL_PATH = 'install_path',
   FORCE = 'force',
-  NO_CACHE = 'no_cache'
+  NO_CACHE = 'no_cache',
+  INSTALLER = 'installer'
 }
+
+/**
+ * Recognized release channels.
+ */
+export type ElideChannel = 'nightly' | 'preview' | 'release'
+
+/**
+ * Recognized installer methods.
+ */
+export type InstallerMethod =
+  | 'archive'
+  | 'shell'
+  | 'msi'
+  | 'pkg'
+  | 'apt'
+  | 'rpm'
 
 /**
  * Describes the interface provided by setup action configuration, once interpreted and once
  * defaults are applied.
  */
-export type ElideChannel = 'nightly' | 'preview' | 'release'
-
 export interface ElideSetupActionOptions {
   // Desired version of Elide; the special token `latest` resolves the latest version.
   version: string | 'latest'
 
   // Release channel: 'nightly' (default), 'preview', or 'release'.
   channel: ElideChannel
+
+  // Installation method: 'archive' (default), 'shell', 'msi', 'pkg', 'apt', or 'rpm'.
+  installer: InstallerMethod
 
   // Whether to setup Elide on the PATH; defaults to `true`.
   export_path: boolean
@@ -84,12 +102,66 @@ const defaultTargetPath =
 export const defaults: ElideSetupActionOptions = {
   version: 'latest',
   channel: 'nightly',
+  installer: 'archive',
   no_cache: false,
   export_path: true,
   force: false,
   os: normalizeOs(process.platform),
   arch: normalizeArch(process.arch),
   install_path: defaultTargetPath
+}
+
+/**
+ * Normalize an installer string to a recognized installer method.
+ */
+export function normalizeInstaller(value: string): InstallerMethod {
+  switch (value.trim().toLowerCase()) {
+    case 'archive':
+      return 'archive'
+    case 'shell':
+      return 'shell'
+    case 'msi':
+      return 'msi'
+    case 'pkg':
+      return 'pkg'
+    case 'apt':
+      return 'apt'
+    case 'rpm':
+      return 'rpm'
+    default:
+      return 'archive'
+  }
+}
+
+/**
+ * Validate that the chosen installer method is compatible with the target OS.
+ * Returns `{ valid: true }` or `{ valid: false, reason: string }`.
+ */
+export function validateInstallerForPlatform(
+  installer: InstallerMethod,
+  targetOs: string
+): { valid: boolean; reason?: string } {
+  switch (installer) {
+    case 'archive':
+    case 'shell':
+      return { valid: true }
+    case 'msi':
+      if (targetOs !== 'windows')
+        return { valid: false, reason: 'MSI is only available on Windows' }
+      return { valid: true }
+    case 'pkg':
+      if (targetOs !== 'darwin')
+        return { valid: false, reason: 'PKG is only available on macOS' }
+      return { valid: true }
+    case 'apt':
+      if (targetOs !== 'linux')
+        return { valid: false, reason: 'apt is only available on Linux' }
+      return { valid: true }
+    case 'rpm':
+      if (targetOs !== 'linux')
+        return { valid: false, reason: 'RPM is only available on Linux' }
+      return { valid: true }
+  }
 }
 
 /**
@@ -195,6 +267,9 @@ function booleanInput(name: string, defaultValue: boolean): boolean {
 export function buildOptionsFromInputs(): ElideSetupActionOptions {
   return buildOptions({
     version: stringInput(OptionName.VERSION, 'latest'),
+    installer: normalizeInstaller(
+      stringInput(OptionName.INSTALLER, 'archive') as string
+    ),
     install_path: stringInput(
       OptionName.INSTALL_PATH,
       process.env.ELIDE_HOME || defaults.install_path

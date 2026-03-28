@@ -117,7 +117,29 @@ export function cdnArch(arch: string): string {
 }
 
 /**
- * Build a download URL for an Elide release.
+ * Build a CDN asset URL for an Elide release artifact.
+ * Appends `?source=gha` for analytics tracking.
+ *
+ * @param options Effective options (uses channel, version, os, arch).
+ * @param ext File extension (e.g. 'tgz', 'txz', 'zip', 'msi', 'pkg', 'rpm').
+ * @return Full CDN URL.
+ */
+export function buildCdnAssetUrl(
+  options: ElideSetupActionOptions,
+  ext: string
+): URL {
+  const channel = options.channel || 'nightly'
+  const revision = options.version === 'latest' ? 'latest' : options.version
+  const os = cdnOs(options.os)
+  const arch = cdnArch(options.arch)
+  return new URL(
+    `${downloadBase}/artifacts/${channel}/${revision}/elide.${os}-${arch}.${ext}?source=gha`
+  )
+}
+
+/**
+ * Build a download URL for an Elide release archive.
+ * Selects the best archive format based on local tool availability.
  *
  * @param options Effective options.
  * @return URL and archive type to use.
@@ -133,33 +155,13 @@ export async function buildDownloadUrl(
     ext = 'zip'
     archiveType = ArchiveType.ZIP
   } else if (hasXz) {
-    // use xz if available
     ext = 'txz'
     archiveType = ArchiveType.TXZ
   }
 
-  // Use the explicit channel from options; fall back to inferring from tag
-  const channel = options.channel || 'nightly'
-
-  // Determine revision: use "latest" when version is "latest",
-  // otherwise use the version as-is (a semver like "1.0.0")
-  let revision: string
-  if (options.version === 'latest') {
-    revision = 'latest'
-  } else {
-    revision = options.version
-  }
-
-  // Map internal tokens to CDN platform tags (darwin→macos, aarch64→arm64)
-  const os = cdnOs(options.os)
-  const arch = cdnArch(options.arch)
-
   return {
     archiveType,
-    url: new URL(
-      // https://elide.zip/artifacts/{channel}/{revision}/elide.{os}-{arch}.{ext}
-      `${downloadBase}/artifacts/${channel}/${revision}/elide.${os}-${arch}.${ext}`
-    )
+    url: buildCdnAssetUrl(options, ext)
   }
 }
 
