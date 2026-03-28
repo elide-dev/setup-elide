@@ -46,6 +46,18 @@ jobs:
       - name: "Build: Bundle"
         run: bun run build
 
+      - name: "Sentry: Upload Source Maps"
+        if: env.SENTRY_AUTH_TOKEN != ''
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: elide-dev
+          SENTRY_PROJECT: setup-elide
+        run: |
+          npx @sentry/cli releases new "setup-elide@${GITHUB_REF_NAME#v}"
+          npx @sentry/cli releases files "setup-elide@${GITHUB_REF_NAME#v}" upload-sourcemaps dist/ --ext js --ext map
+          npx @sentry/cli releases finalize "setup-elide@${GITHUB_REF_NAME#v}"
+          npx @sentry/cli releases deploys "setup-elide@${GITHUB_REF_NAME#v}" new -e production
+
       - name: "Build: Package Artifact"
         run: |
           TAG="${GITHUB_REF_NAME}"
@@ -54,6 +66,8 @@ jobs:
             action.yml \
             dist/index.js \
             dist/index.js.map \
+            dist/post.js \
+            dist/post.js.map \
             package.json \
             .github/LICENSE
           sha256sum "artifacts/setup-elide-${TAG}.tar.gz" > "artifacts/setup-elide-${TAG}.tar.gz.sha256"

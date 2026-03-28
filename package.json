@@ -34,6 +34,7 @@
     "@actions/http-client": "4.0.0",
     "@actions/io": "3.0.2",
     "@actions/tool-cache": "4.0.0",
+    "@sentry/node": "^10.46.0",
     "octokit": "5.0.5"
   },
   "devDependencies": {
@@ -57,9 +58,9 @@
     "format:write": "biome format --write src __tests__",
     "format:check": "biome format src __tests__",
     "lint": "oxlint src __tests__",
-    "package": "bun build src/index.ts --outdir=dist --target=node --minify --sourcemap=linked",
-    "package:watch": "bun build src/index.ts --outdir=dist --target=node --sourcemap=linked --watch",
-    "test": "bun test __tests__/options.test.ts __tests__/platform.test.ts __tests__/releases.test.ts __tests__/index.test.ts && bun test __tests__/command.test.ts && bun test __tests__/releases-download.test.ts && bun test __tests__/install-apt.test.ts __tests__/install-shell.test.ts __tests__/install-msi.test.ts __tests__/install-pkg.test.ts __tests__/install-rpm.test.ts && bun test __tests__/main.test.ts",
+    "package": "bun build src/index.ts src/post.ts --outdir=dist --target=node --minify --sourcemap=linked",
+    "package:watch": "bun build src/index.ts src/post.ts --outdir=dist --target=node --sourcemap=linked --watch",
+    "test": "bun test __tests__/options.test.ts __tests__/platform.test.ts __tests__/releases.test.ts __tests__/index.test.ts && bun test __tests__/command.test.ts && bun test __tests__/releases-download.test.ts && bun test __tests__/telemetry.test.ts && bun test __tests__/install-apt.test.ts __tests__/install-shell.test.ts __tests__/install-msi.test.ts __tests__/install-pkg.test.ts __tests__/install-rpm.test.ts && bun test __tests__/main.test.ts",
     "test:docker": "docker build -t setup-elide-test . && docker run --rm setup-elide-test sh -c 'bun run build && bun run test'",
     "all": "bun run format:write && bun run build && bun run test"
   },

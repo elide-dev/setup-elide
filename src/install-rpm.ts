@@ -29,7 +29,7 @@ export async function installViaRpm(
     await exec.exec('sudo', ['dnf', 'install', '-y', rpmPath])
   } else {
     core.info('Installing Elide via rpm')
-    await exec.exec('sudo', ['rpm', '-i', rpmPath])
+    await exec.exec('sudo', ['rpm', '-U', '--replacepkgs', rpmPath])
   }
 
   const elidePath = await which('elide', true)

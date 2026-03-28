@@ -60,6 +60,9 @@ export type ElideRelease = {
   // Path to Elide's bin folder.
   elideBin: string
 
+  // Whether this release was served from the tool cache.
+  cached?: boolean
+
   // Deferred cleanup or after-action method.
   deferred?: () => Promise<void>
 }
@@ -384,11 +387,13 @@ async function maybeDownload(
     }
   }
 
+  const wasCached = !!(options.no_cache !== true && elideDir)
   const result = {
     version,
     elidePath,
     elideHome: elidePathTarget,
-    elideBin
+    elideBin,
+    cached: wasCached
   }
   core.debug(`Elide release info: ${JSON.stringify(result)}`)
   return result

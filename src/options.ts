@@ -17,7 +17,8 @@ export enum OptionName {
   INSTALL_PATH = 'install_path',
   FORCE = 'force',
   NO_CACHE = 'no_cache',
-  INSTALLER = 'installer'
+  INSTALLER = 'installer',
+  TELEMETRY = 'telemetry'
 }
 
 /**
@@ -76,6 +77,9 @@ export interface ElideSetupActionOptions {
 
   // Custom GitHub token to use, or the workflow's default token, if any.
   token?: string
+
+  // Whether to send anonymous error telemetry; defaults to `true`.
+  telemetry: boolean
 }
 
 /**
@@ -103,6 +107,7 @@ export const defaults: ElideSetupActionOptions = {
   version: 'latest',
   channel: 'nightly',
   installer: 'archive',
+  telemetry: true,
   no_cache: false,
   export_path: true,
   force: false,
@@ -247,9 +252,25 @@ export default function buildOptions(
   } satisfies ElideSetupActionOptions
 }
 
+const SENSITIVE_INPUT_NAMES = new Set([OptionName.TOKEN, 'secret', 'password'])
+
+function isSensitiveInput(name: string): boolean {
+  return (
+    SENSITIVE_INPUT_NAMES.has(name) ||
+    name.toLowerCase().includes('token') ||
+    name.toLowerCase().includes('secret')
+  )
+}
+
 function stringInput(name: string, defaultValue?: string): string | undefined {
   const value = core.getInput(name)
-  core.debug(`Input: ${name}=${value || defaultValue}`)
+  if (isSensitiveInput(name)) {
+    core.debug(
+      `Input: ${name}=${value ? '<redacted>' : defaultValue ? '<redacted>' : '<empty>'}`
+    )
+  } else {
+    core.debug(`Input: ${name}=${value || defaultValue}`)
+  }
   return value || defaultValue || undefined
 }
 
@@ -279,8 +300,10 @@ export function buildOptionsFromInputs(): ElideSetupActionOptions {
     channel: normalizeChannel(
       stringInput(OptionName.CHANNEL, 'nightly') as string
     ),
+    force: booleanInput(OptionName.FORCE, false),
     export_path: booleanInput(OptionName.EXPORT_PATH, true),
     no_cache: booleanInput(OptionName.NO_CACHE, false),
+    telemetry: booleanInput(OptionName.TELEMETRY, true),
     token: stringInput(OptionName.TOKEN, process.env.GITHUB_TOKEN),
     custom_url: stringInput(OptionName.CUSTOM_URL),
     version_tag: stringInput(OptionName.VERSION_TAG)

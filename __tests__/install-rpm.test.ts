@@ -128,7 +128,8 @@ describe('install-rpm', () => {
 
     expect(execMock).toHaveBeenCalledWith('sudo', [
       'rpm',
-      '-i',
+      '-U',
+      '--replacepkgs',
       '/tmp/elide.rpm'
     ])
     expect(execMock).not.toHaveBeenCalledWith(

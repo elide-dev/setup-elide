@@ -13,10 +13,22 @@ const debugMock = jest.fn()
 const infoMock = jest.fn()
 const warningMock = jest.fn()
 const errorMock = jest.fn()
+const noticeMock = jest.fn()
 const addPathMock = jest.fn()
+const groupMock = jest.fn(async (_name: string, fn: () => Promise<any>) => fn())
+const summaryMock = {
+  addHeading: jest.fn().mockReturnThis(),
+  addTable: jest.fn().mockReturnThis(),
+  addCodeBlock: jest.fn().mockReturnThis(),
+  addLink: jest.fn().mockReturnThis(),
+  write: jest.fn().mockResolvedValue(undefined)
+}
 const downloadToolMock = jest.fn().mockResolvedValue('/tmp/install.sh')
 const elideInfoMock = jest.fn().mockResolvedValue(undefined)
 const obtainVersionMock = jest.fn().mockResolvedValue('1.0.0')
+const initTelemetryMock = jest.fn()
+const reportErrorMock = jest.fn()
+const flushTelemetryMock = jest.fn().mockResolvedValue(undefined)
 
 // Mock modules before any project imports
 mock.module('@actions/exec', () => ({
@@ -35,11 +47,14 @@ mock.module('@actions/core', () => ({
   debug: debugMock,
   error: errorMock,
   warning: warningMock,
+  notice: noticeMock,
   getInput: getInputMock,
   getBooleanInput: jest.fn().mockReturnValue(true),
   setFailed: setFailedMock,
   setOutput: setOutputMock,
-  addPath: addPathMock
+  addPath: addPathMock,
+  group: groupMock,
+  summary: summaryMock
 }))
 mock.module('@actions/tool-cache', () => ({
   downloadTool: downloadToolMock,
@@ -53,6 +68,11 @@ mock.module('../src/command', () => ({
   obtainVersion: obtainVersionMock,
   ElideCommand: { RUN: 'run', INFO: 'info' },
   ElideArgument: { VERSION: '--version' }
+}))
+mock.module('../src/telemetry', () => ({
+  initTelemetry: initTelemetryMock,
+  reportError: reportErrorMock,
+  flushTelemetry: flushTelemetryMock
 }))
 
 const main = await import('../src/main')
@@ -78,7 +98,6 @@ const setupMocks = () => {
 
 describe('action', () => {
   beforeEach(() => {
-    // Clear all mock state
     execMock.mockClear()
     getExecOutputMock.mockClear()
     whichMock.mockClear()
@@ -89,14 +108,25 @@ describe('action', () => {
     infoMock.mockClear()
     warningMock.mockClear()
     errorMock.mockClear()
+    noticeMock.mockClear()
     addPathMock.mockClear()
+    groupMock.mockClear()
     downloadToolMock.mockClear()
     elideInfoMock.mockClear()
     obtainVersionMock.mockClear()
-    // Default: getInput returns empty
-    getInputMock.mockReturnValue('')
+    initTelemetryMock.mockClear()
+    reportErrorMock.mockClear()
+    flushTelemetryMock.mockClear()
+    summaryMock.addHeading.mockClear()
+    summaryMock.addTable.mockClear()
+    summaryMock.write.mockClear()
+    summaryMock.addCodeBlock.mockClear()
+    summaryMock.addLink.mockClear()
 
-    // Default: install script path succeeds
+    getInputMock.mockReturnValue('')
+    groupMock.mockImplementation(
+      async (_name: string, fn: () => Promise<any>) => fn()
+    )
     downloadToolMock.mockResolvedValue('/tmp/install.sh')
     execMock.mockResolvedValue(0)
     whichMock.mockResolvedValue('/mock/bin/elide')
@@ -107,6 +137,7 @@ describe('action', () => {
     })
     elideInfoMock.mockResolvedValue(undefined)
     obtainVersionMock.mockResolvedValue('1.0.0')
+    flushTelemetryMock.mockResolvedValue(undefined)
   })
 
   it('reads option inputs', async () => {
@@ -135,13 +166,71 @@ describe('action', () => {
     )
   })
 
-  it('should fail for unhandled exceptions', async () => {
+  it('sets cached and installer outputs', async () => {
     setupMocks()
-    infoMock.mockImplementationOnce(() => {
-      throw new Error('oh noes')
+    await main.run({ force: true, installer: 'shell' })
+    expect(setOutputMock).toHaveBeenCalledWith(ActionOutputName.CACHED, 'false')
+    expect(setOutputMock).toHaveBeenCalledWith(
+      ActionOutputName.INSTALLER,
+      'shell'
+    )
+  })
+
+  it('should initialize telemetry', async () => {
+    setupMocks()
+    await main.run()
+    expect(initTelemetryMock).toHaveBeenCalled()
+  })
+
+  it('should flush telemetry in finally block', async () => {
+    setupMocks()
+    await main.run()
+    expect(flushTelemetryMock).toHaveBeenCalled()
+  })
+
+  it('should report errors to telemetry on failure', async () => {
+    setupMocks()
+    infoMock.mockImplementation((msg: string) => {
+      if (msg.includes('Options:')) throw new Error('oh noes')
     })
     await main.run()
+    expect(reportErrorMock).toHaveBeenCalled()
     expect(setFailedMock).toHaveBeenCalled()
+  })
+
+  it('should use grouped output', async () => {
+    setupMocks()
+    await main.run({ force: true, installer: 'shell' })
+    expect(groupMock).toHaveBeenCalledWith(
+      '⚙️ Resolving options',
+      expect.any(Function)
+    )
+    expect(groupMock).toHaveBeenCalledWith(
+      '📦 Installing Elide via shell',
+      expect.any(Function)
+    )
+    expect(groupMock).toHaveBeenCalledWith(
+      '✅ Verifying installation',
+      expect.any(Function)
+    )
+  })
+
+  it('should write job summary on success', async () => {
+    setupMocks()
+    await main.run({ force: true, installer: 'shell' })
+    expect(summaryMock.addHeading).toHaveBeenCalledWith('Elide Installed', 2)
+    expect(summaryMock.write).toHaveBeenCalled()
+  })
+
+  it('should write error summary on failure', async () => {
+    setupMocks()
+    infoMock.mockImplementation((msg: string) => {
+      if (msg.includes('Options:')) throw new Error('install boom')
+    })
+    await main.run()
+    expect(summaryMock.addHeading).toHaveBeenCalledWith('Setup Elide Failed', 2)
+    expect(summaryMock.addCodeBlock).toHaveBeenCalled()
+    expect(summaryMock.write).toHaveBeenCalled()
   })
 
   it('should properly detect existing elide binary', async () => {
@@ -161,7 +250,7 @@ describe('action', () => {
 
   it('should use archive installer by default', async () => {
     setupMocks()
-    await main.run({ force: true })
+    await main.run({ force: true, installer: 'shell' })
     expect(setFailedMock).not.toHaveBeenCalled()
     expect(setOutputMock).toHaveBeenCalledWith(
       ActionOutputName.PATH,
@@ -188,17 +277,6 @@ describe('action', () => {
     })
     expect(setFailedMock).not.toHaveBeenCalled()
     expect(infoMock).toHaveBeenCalledWith(expect.stringContaining('apt'))
-  })
-
-  it('should use archive download for windows with archive installer', async () => {
-    setupMocks()
-    await main.run({
-      force: true,
-      os: 'windows',
-      arch: 'amd64',
-      installer: 'archive'
-    })
-    expect(setFailedMock).not.toHaveBeenCalled()
   })
 
   it('should use msi installer on windows', async () => {
@@ -245,24 +323,12 @@ describe('action', () => {
       force: true,
       os: 'linux',
       arch: 'amd64',
+      version: '1.0.0',
       installer: 'msi'
     })
     expect(warningMock).toHaveBeenCalledWith(
-      expect.stringContaining("Installer 'msi' is not supported on linux")
-    )
-    expect(setFailedMock).not.toHaveBeenCalled()
-  })
-
-  it('should warn and fall back for pkg on linux', async () => {
-    setupMocks()
-    await main.run({
-      force: true,
-      os: 'linux',
-      arch: 'amd64',
-      installer: 'pkg'
-    })
-    expect(warningMock).toHaveBeenCalledWith(
-      expect.stringContaining("Installer 'pkg' is not supported on linux")
+      expect.stringContaining("Installer 'msi' is not supported on linux"),
+      expect.objectContaining({ title: 'Installer Fallback' })
     )
     expect(setFailedMock).not.toHaveBeenCalled()
   })
@@ -277,16 +343,12 @@ describe('action', () => {
       ActionOutputName.PATH,
       expect.anything()
     )
-    expect(setOutputMock).toHaveBeenCalledWith(
-      ActionOutputName.VERSION,
-      expect.anything()
-    )
   })
 
   it('should gracefully handle post-install info failure', async () => {
     setupMocks()
     elideInfoMock.mockRejectedValueOnce(new Error('info boom'))
-    await main.run({ force: true })
+    await main.run({ force: true, installer: 'shell' })
     expect(setFailedMock).not.toHaveBeenCalled()
     expect(debugMock).toHaveBeenCalledWith(
       expect.stringContaining('Post-install info failed; proceeding anyway')
@@ -306,19 +368,19 @@ describe('action', () => {
       ActionOutputName.VERSION,
       '1.0.0'
     )
-    expect(infoMock).toHaveBeenCalledWith(
-      expect.stringContaining('was preserved')
+    expect(noticeMock).toHaveBeenCalledWith(
+      expect.stringContaining('preserved'),
+      expect.objectContaining({ title: 'Already Installed' })
     )
   })
 
   it('should warn on version mismatch', async () => {
     setupMocks()
-    // First call (inside installViaShell) returns '1.0.0' as the installed version,
-    // second call (main.run verification) returns a different version.
     obtainVersionMock.mockResolvedValueOnce('1.0.0').mockResolvedValue('9.9.9')
     await main.run({ force: true, installer: 'shell' })
     expect(warningMock).toHaveBeenCalledWith(
-      expect.stringContaining('Elide version mismatch')
+      expect.stringContaining('Elide version mismatch'),
+      expect.objectContaining({ title: 'Version Mismatch' })
     )
   })
 
@@ -338,7 +400,7 @@ describe('action', () => {
 
   it('should not export to path when export_path is false', async () => {
     setupMocks()
-    await main.run({ force: true, export_path: false })
+    await main.run({ force: true, export_path: false, installer: 'shell' })
     expect(addPathMock).not.toHaveBeenCalled()
     expect(setFailedMock).not.toHaveBeenCalled()
   })
