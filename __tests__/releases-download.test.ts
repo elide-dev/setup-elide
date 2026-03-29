@@ -56,9 +56,8 @@ mock.module('../src/command', () => ({
   elideInfo: jest.fn()
 }))
 
-const { downloadRelease, resolveLatestVersion } = await import(
-  '../src/releases'
-)
+const { downloadRelease, resolveLatestVersion, toSemverCacheKey } =
+  await import('../src/releases')
 const { default: buildOptions } = await import('../src/options')
 
 describe('resolveLatestVersion', () => {
@@ -113,6 +112,28 @@ describe('resolveLatestVersion', () => {
     expect(warningMock).toHaveBeenCalledWith(
       expect.stringContaining('No GitHub token provided')
     )
+  })
+})
+
+describe('toSemverCacheKey', () => {
+  it('should pass through valid semver', () => {
+    expect(toSemverCacheKey('1.0.0')).toBe('1.0.0')
+    expect(toSemverCacheKey('1.0.0-beta10')).toBe('1.0.0-beta10')
+    expect(toSemverCacheKey('1.0.0-alpha9')).toBe('1.0.0-alpha9')
+    expect(toSemverCacheKey('2.1.3')).toBe('2.1.3')
+  })
+
+  it('should convert nightly tags to semver prerelease', () => {
+    expect(toSemverCacheKey('nightly-20260328')).toBe('0.0.0-nightly.20260328')
+    expect(toSemverCacheKey('nightly-2026-03-28')).toBe(
+      '0.0.0-nightly.20260328'
+    )
+    expect(toSemverCacheKey('nightly-20251231')).toBe('0.0.0-nightly.20251231')
+  })
+
+  it('should pass through unknown formats unchanged', () => {
+    expect(toSemverCacheKey('dev')).toBe('dev')
+    expect(toSemverCacheKey('custom-build')).toBe('custom-build')
   })
 })
 
@@ -424,6 +445,59 @@ describe('downloadRelease', () => {
       await downloadRelease(modernOpts)
       // 1.0 should use cache (no download)
       expect(downloadToolMock).not.toHaveBeenCalled()
+    })
+
+    it('nightly versions should use semver cache keys', async () => {
+      findMock.mockReturnValue('')
+      requestMock.mockResolvedValue({
+        data: { tag_name: 'nightly-20260328', name: 'Nightly' }
+      })
+      const options = buildOptions({
+        os: 'linux',
+        arch: 'amd64',
+        version: 'latest'
+      })
+      await downloadRelease(options)
+
+      // find should be called with the semver cache key, not the raw tag
+      expect(findMock).toHaveBeenCalledWith(
+        'elide',
+        '0.0.0-nightly.20260328',
+        'amd64'
+      )
+      // cacheDir should also use the semver key
+      expect(cacheDirMock).toHaveBeenCalledWith(
+        expect.any(String),
+        'elide',
+        '0.0.0-nightly.20260328',
+        'amd64'
+      )
+    })
+
+    it('second run with nightly should hit cache', async () => {
+      findMock.mockReturnValue(
+        '/cache/tools/elide/0.0.0-nightly.20260328/amd64'
+      )
+      requestMock.mockResolvedValue({
+        data: { tag_name: 'nightly-20260328', name: 'Nightly' }
+      })
+      const options = buildOptions({
+        os: 'linux',
+        arch: 'amd64',
+        version: 'latest'
+      })
+      const result = await downloadRelease(options)
+
+      expect(findMock).toHaveBeenCalledWith(
+        'elide',
+        '0.0.0-nightly.20260328',
+        'amd64'
+      )
+      expect(downloadToolMock).not.toHaveBeenCalled()
+      expect(result.cached).toBe(true)
+      expect(result.elideBin).toBe(
+        '/cache/tools/elide/0.0.0-nightly.20260328/amd64/bin'
+      )
     })
 
     it('different architectures should not share cache', async () => {

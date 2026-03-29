@@ -16,6 +16,34 @@ const GITHUB_DEFAULT_HEADERS = {
   'X-GitHub-Api-Version': GITHUB_API_VERSION
 }
 
+// Matches tags like "nightly-20260328" or "nightly-2026-03-28"
+const NIGHTLY_TAG_RE = /^nightly-(.+)$/
+
+/**
+ * Convert a release tag to a valid semver string for use with @actions/tool-cache.
+ *
+ * tool-cache's `find()` calls `semver.clean()` on the version, which returns null
+ * for non-semver strings like "nightly-20260328". This causes cache lookups to
+ * silently fail (never hit, never store correctly).
+ *
+ * Mapping:
+ *   "1.0.0"              → "1.0.0"          (already semver)
+ *   "1.0.0-beta10"       → "1.0.0-beta10"   (valid semver prerelease)
+ *   "nightly-20260328"   → "0.0.0-nightly.20260328"
+ *
+ * We use prerelease (not build metadata with +) because semver.clean strips
+ * build metadata, making it useless for cache key matching.
+ */
+export function toSemverCacheKey(tag: string): string {
+  const nightlyMatch = tag.match(NIGHTLY_TAG_RE)
+  if (nightlyMatch) {
+    // Use prerelease segment so semver.clean preserves it
+    const datePart = nightlyMatch[1].replaceAll('-', '')
+    return `0.0.0-nightly.${datePart}`
+  }
+  return tag
+}
+
 /**
  * Version info resolved for a release of Elide.
  */
@@ -359,12 +387,13 @@ async function maybeDownload(
   let elidePathTarget = elideHome
   let elideBin: string = `${elideHome}${sep}bin`
   let elideDir: string | null = null
+  const cacheVersion = toSemverCacheKey(version.tag_name)
 
   try {
     core.debug(
-      `Checking for cached tool 'elide' at version '${version.tag_name}'`
+      `Checking for cached tool 'elide' at version '${version.tag_name}' (cache key: ${cacheVersion})`
     )
-    elideDir = toolCache.find('elide', version.tag_name, options.arch)
+    elideDir = toolCache.find('elide', cacheVersion, options.arch)
   } catch (err) {
     core.debug(`Failed to locate Elide in tool cache: ${err}`)
   }
@@ -412,7 +441,7 @@ async function maybeDownload(
       const cachedPath = await toolCache.cacheDir(
         elideHome,
         'elide',
-        version.tag_name,
+        cacheVersion,
         options.arch
       )
 
