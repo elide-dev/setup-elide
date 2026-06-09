@@ -1,7 +1,7 @@
 import * as core from '@actions/core'
 import * as io from '@actions/io'
 import { ActionOutputName, ElideSetupActionOutputs } from './outputs'
-import { prewarm, info, obtainVersion } from './command'
+import { prewarm, info, obtainVersion, versionsMatch } from './command'
 
 import buildOptions, {
   OptionName,
@@ -145,7 +145,7 @@ export async function run(
 
         /* istanbul ignore next */
         if (
-          version === effectiveOptions.version ||
+          versionsMatch(version, effectiveOptions.version) ||
           effectiveOptions.version === 'local'
         ) {
           core.info(
@@ -179,7 +179,7 @@ export async function run(
     const version = await obtainVersion(release.elidePath)
 
     /* istanbul ignore next */
-    if (version !== release.version.tag_name) {
+    if (!versionsMatch(version, release.version.tag_name)) {
       core.warning(
         `Elide version mismatch: expected '${release.version.tag_name}', but got '${version}'`
       )

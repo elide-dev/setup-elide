@@ -62,3 +62,30 @@ export async function obtainVersion(bin: string): Promise<string> {
     .trim()
     .replaceAll('%0A', '')
 }
+
+/**
+ * Normalize a version string for tolerant comparison: trim, drop a leading `v`,
+ * and strip semver build metadata (everything from the first `+`). Lets a
+ * release tag like `1.2.0+20260430` or `v1.2.0` compare equal to a binary that
+ * self-reports `1.2.0`.
+ *
+ * @param value Version or tag string.
+ * @return Normalized version string.
+ */
+export function normalizeVersion(value: string): string {
+  return value.trim().replace(/^v/i, '').replace(/\+.*$/, '')
+}
+
+/**
+ * Whether two version strings refer to the same release, ignoring a leading `v`
+ * and build metadata. An empty or unparseable side never matches.
+ *
+ * @param a First version or tag string.
+ * @param b Second version or tag string.
+ * @return `true` if the normalized versions are equal.
+ */
+export function versionsMatch(a: string, b: string): boolean {
+  const na = normalizeVersion(a)
+  const nb = normalizeVersion(b)
+  return na.length > 0 && na === nb
+}
