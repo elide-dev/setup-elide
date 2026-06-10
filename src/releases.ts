@@ -13,6 +13,17 @@ const downloadBase = 'https://gha.elide.zip'
 const downloadPathV1 = 'cli/v1/snapshot'
 
 /**
+ * A downloadable asset attached to a GitHub release.
+ */
+export type ReleaseAsset = {
+  // Asset filename, e.g. `elide.linux-amd64.txz`.
+  name: string
+
+  // Direct download URL (`browser_download_url`).
+  url: string
+}
+
+/**
  * Version info resolved for a release of Elide.
  */
 export type ElideVersionInfo = {
@@ -24,6 +35,9 @@ export type ElideVersionInfo = {
 
   // Whether this version is resolved (`false`) or user-provided (`true`).
   userProvided: boolean
+
+  // Release assets, when resolved from a GitHub release (e.g. via `latest`).
+  assets?: ReleaseAsset[]
 }
 
 /**
@@ -97,11 +111,44 @@ export interface DownloadedToolInfo {
 }
 
 /**
- * Build a download URL for an Elide release; if a custom URL is provided as part of the set of
- * `options`, use it instead.
+ * Platform label used in release asset filenames (`elide.<os>-<arch>.<ext>`).
+ * These differ from the action's internal {@link ElideOS}/{@link ElideArch}
+ * values: assets use `macos` (not `darwin`) and `arm64` (not `aarch64`).
  *
- * @param version Version we are downloading.
  * @param options Effective options.
+ * @return Asset platform label, e.g. `linux-amd64` or `macos-arm64`.
+ */
+function assetPlatformLabel(options: ElideSetupActionOptions): string {
+  const os = options.os === ElideOS.MACOS ? 'macos' : options.os
+  const arch = options.arch === ElideArch.ARM64 ? 'arm64' : options.arch
+  return `${os}-${arch}`
+}
+
+/**
+ * Resolve the download URL for this platform from a release's attached assets,
+ * if available.
+ *
+ * @param version Resolved version info (may carry release assets).
+ * @param options Effective options.
+ * @param ext Archive extension to match (`txz`, `tgz`, or `zip`).
+ * @return Asset download URL, or `null` if no matching asset is present.
+ */
+function findAssetUrl(
+  version: ElideVersionInfo,
+  options: ElideSetupActionOptions,
+  ext: string
+): string | null {
+  if (!version.assets || version.assets.length === 0) return null
+  const wanted = `elide.${assetPlatformLabel(options)}.${ext}`
+  return version.assets.find(a => a.name === wanted)?.url ?? null
+}
+
+/**
+ * Build a download URL for an Elide release: prefer the resolved release's
+ * platform asset, falling back to the CDN mirror.
+ *
+ * @param options Effective options.
+ * @param version Version we are downloading.
  * @return URL and archive type to use.
  */
 async function buildDownloadUrl(
@@ -120,6 +167,16 @@ async function buildDownloadUrl(
     // use xz if available
     ext = 'txz'
     archiveType = ArchiveType.TXZ
+  }
+
+  // Prefer the GitHub release asset when we resolved a release (e.g. `latest`).
+  // The CDN mirror is keyed by stable-release tag and does not host nightly
+  // tags (`<semver>+<datestamp>`), so the release asset is the authoritative
+  // per-version source and the only one that works for nightly-as-latest.
+  const assetUrl = findAssetUrl(version, options, ext)
+  if (assetUrl) {
+    core.debug(`Using release asset download URL: ${assetUrl}`)
+    return { archiveType, url: new URL(assetUrl) }
   }
 
   return {
@@ -268,7 +325,11 @@ export async function resolveLatestVersion(
   return {
     name,
     tag_name: latest.data.tag_name,
-    userProvided: !!token
+    userProvided: !!token,
+    assets: (latest.data.assets ?? []).map(a => ({
+      name: a.name,
+      url: a.browser_download_url
+    }))
   }
 }
 
