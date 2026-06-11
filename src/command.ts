@@ -1,5 +1,8 @@
 import * as core from '@actions/core'
 import * as exec from '@actions/exec'
+import { writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 async function execElide(bin: string, args?: string[]): Promise<void> {
   core.debug(`Executing: bin=${bin}, args=${args}`)
@@ -27,16 +30,28 @@ export enum ElideArgument {
 /**
  * Prewarm the provided Elide binary by running a small script.
  *
+ * Runs a temp script file rather than inline code (`run -c`), since inline
+ * eval flags differ across Elide versions while `elide run <file>` is stable.
+ * Best-effort: prewarming is an optimization, so failures are logged as
+ * warnings and never fail the action.
+ *
  * @param bin Path to the Elide binary.
  * @return Promise which resolves when finished.
  */
 export async function prewarm(bin: string): Promise<void> {
   core.info(`Prewarming Elide at bin: ${bin}`)
-  return execElide(bin, [
-    ElideCommand.RUN,
-    '-c',
-    '"console.log(\'Elide ready.\')"'
-  ])
+  try {
+    const script = join(tmpdir(), 'elide-prewarm.js')
+    writeFileSync(script, "console.log('Elide ready.')\n")
+    const exit = await exec.exec(`"${bin}"`, [ElideCommand.RUN, script], {
+      ignoreReturnCode: true
+    })
+    if (exit !== 0) {
+      core.warning(`Elide prewarm exited with code ${exit} (non-fatal)`)
+    }
+  } catch (err) {
+    core.warning(`Elide prewarm failed (non-fatal): ${err}`)
+  }
 }
 
 /**
