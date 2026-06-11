@@ -8,6 +8,7 @@ import { obtainVersion } from './command'
 import { which, mv } from '@actions/io'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 
 const downloadBase = 'https://gha.elide.zip'
 const downloadPathV1 = 'cli/v1/snapshot'
@@ -334,6 +335,29 @@ export async function resolveLatestVersion(
 }
 
 /**
+ * Locate the `elide` binary within an unpacked install or cache dir. CDN
+ * snapshot archives unpack with the binary at the root; GitHub release assets
+ * are full distributions with the binary under `bin/`. Probe both.
+ *
+ * @param home Unpacked install/cache directory.
+ * @param options Effective setup action options.
+ * @return Binary path + its containing dir (for PATH), or `null` if absent.
+ */
+function locateBinary(
+  home: string,
+  options: ElideSetupActionOptions
+): { elidePath: string; elideBin: string } | null {
+  /* istanbul ignore next */
+  const exe = options.os === ElideOS.WINDOWS ? 'elide.exe' : 'elide'
+  for (const sub of ['', 'bin']) {
+    const dir = sub ? join(home, sub) : home
+    const candidate = join(dir, exe)
+    if (existsSync(candidate)) return { elidePath: candidate, elideBin: dir }
+  }
+  return null
+}
+
+/**
  * Conditionally download the desired version of Elide, or use a cached version, if available.
  *
  * @param version Resolved version info for the desired copy of Elide.
@@ -432,6 +456,17 @@ async function maybeDownload(
     } else {
       core.debug('Tool caching is disabled; not caching downloaded release')
     }
+  }
+
+  // Resolve where the binary actually landed: root for CDN snapshot archives,
+  // `bin/` for full-distribution release assets. Pointing `elideBin` (added to
+  // PATH) at the real bin dir also exposes the bundled toolchain (javac,
+  // kotlinc, …) for release assets. Falls back to the legacy root paths when
+  // the probe finds nothing.
+  const located = locateBinary(elidePathTarget, options)
+  if (located) {
+    elidePath = located.elidePath
+    elideBin = located.elideBin
   }
 
   const result = {
