@@ -49,6 +49,13 @@ describe('toSemverCacheKey', () => {
       '1.0.0-beta10-build.20260707'
     )
   })
+
+  it('should handle multi-part build metadata', () => {
+    // e.g. if the tag itself embeds date+commit: 1.4.0+20260707.abc123
+    expect(toSemverCacheKey('1.4.0+20260707.abc123')).toBe(
+      '1.4.0-build.20260707.abc123'
+    )
+  })
 })
 
 describe('elide release', () => {

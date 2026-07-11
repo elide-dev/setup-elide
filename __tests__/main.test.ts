@@ -85,6 +85,7 @@ mock.module('../src/telemetry', () => ({
 }))
 
 const main = await import('../src/main')
+const { versionMatchesTag } = main
 const { default: buildOptions, OptionName } = await import('../src/options')
 const { ElideArch, ElideOS } = await import('../src/releases')
 const { ActionOutputName } = await import('../src/main')
@@ -104,6 +105,55 @@ const setupMocks = () => {
   )
   setFailedMock.mockImplementation(() => {})
 }
+
+describe('versionMatchesTag', () => {
+  it('exact match', () => {
+    expect(versionMatchesTag('1.0.0', '1.0.0')).toBe(true)
+  })
+
+  it('exact match with prerelease tag', () => {
+    expect(versionMatchesTag('1.0.0-beta10', '1.0.0-beta10')).toBe(true)
+  })
+
+  it('exact match with build-metadata tag', () => {
+    expect(versionMatchesTag('1.4.0+20260707', '1.4.0+20260707')).toBe(true)
+  })
+
+  it('commit-hash suffix on plain semver tag', () => {
+    expect(versionMatchesTag('1.0.0.6f7ffa7', '1.0.0')).toBe(true)
+  })
+
+  it('commit-hash suffix on prerelease tag', () => {
+    expect(versionMatchesTag('1.0.0-beta10.6f7ffa7', '1.0.0-beta10')).toBe(
+      true
+    )
+  })
+
+  it('commit-hash suffix on build-metadata tag', () => {
+    expect(versionMatchesTag('1.4.0+20260707.6f7ffa7', '1.4.0+20260707')).toBe(
+      true
+    )
+  })
+
+  it('different version — no match', () => {
+    expect(versionMatchesTag('9.9.9', '1.0.0')).toBe(false)
+  })
+
+  it('binary ahead of requested prerelease — no match', () => {
+    expect(versionMatchesTag('1.0.0', '1.0.0-beta10')).toBe(false)
+  })
+
+  it('tag is not a prefix without dot separator — no match', () => {
+    // "1.0.01" must not match tag "1.0.0" (no dot between them)
+    expect(versionMatchesTag('1.0.01', '1.0.0')).toBe(false)
+  })
+
+  it('binary build date does not match tag build date — no match', () => {
+    expect(
+      versionMatchesTag('1.4.0+20260708.6f7ffa7', '1.4.0+20260707')
+    ).toBe(false)
+  })
+})
 
 describe('action', () => {
   beforeEach(() => {
