@@ -33,7 +33,10 @@ export async function installViaMsi(
   core.info(`Elide ${version} installed via MSI at ${elidePath}`)
 
   return {
-    version: { tag_name: options.version, userProvided: options.version !== 'latest' },
+    version: {
+      tag_name: options.version,
+      userProvided: options.version !== 'latest'
+    },
     elidePath,
     elideHome,
     elideBin

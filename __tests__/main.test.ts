@@ -124,9 +124,7 @@ describe('versionMatchesTag', () => {
   })
 
   it('commit-hash suffix on prerelease tag', () => {
-    expect(versionMatchesTag('1.0.0-beta10.6f7ffa7', '1.0.0-beta10')).toBe(
-      true
-    )
+    expect(versionMatchesTag('1.0.0-beta10.6f7ffa7', '1.0.0-beta10')).toBe(true)
   })
 
   it('commit-hash suffix on build-metadata tag', () => {
@@ -149,9 +147,9 @@ describe('versionMatchesTag', () => {
   })
 
   it('binary build date does not match tag build date — no match', () => {
-    expect(
-      versionMatchesTag('1.4.0+20260708.6f7ffa7', '1.4.0+20260707')
-    ).toBe(false)
+    expect(versionMatchesTag('1.4.0+20260708.6f7ffa7', '1.4.0+20260707')).toBe(
+      false
+    )
   })
 })
 
