@@ -120,11 +120,6 @@ jobs:
           #   runner: macos-latest
           #   installer: pkg
 
-          # --- macOS AMD64 ---
-          - name: macos-amd64 (archive)
-            runner: macos-15-intel
-            installer: archive
-
           # --- Windows AMD64 ---
           - name: windows-amd64 (archive)
             runner: windows-latest
