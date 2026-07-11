@@ -266,7 +266,11 @@ export async function run(
 
             const isNightly = release.version.tag_name.startsWith('nightly-')
             const isSymbolic = release.version.tag_name === 'latest'
-            if (!isNightly && !isSymbolic && !versionMatchesTag(ver, release.version.tag_name)) {
+            if (
+              !isNightly &&
+              !isSymbolic &&
+              !versionMatchesTag(ver, release.version.tag_name)
+            ) {
               core.warning(
                 `Elide version mismatch: expected '${release.version.tag_name}', but got '${ver}'`,
                 { title: 'Version Mismatch' }
