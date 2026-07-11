@@ -265,7 +265,8 @@ export async function run(
             const ver = await obtainVersion(release.elidePath)
 
             const isNightly = release.version.tag_name.startsWith('nightly-')
-            if (!isNightly && !versionMatchesTag(ver, release.version.tag_name)) {
+            const isSymbolic = release.version.tag_name === 'latest'
+            if (!isNightly && !isSymbolic && !versionMatchesTag(ver, release.version.tag_name)) {
               core.warning(
                 `Elide version mismatch: expected '${release.version.tag_name}', but got '${ver}'`,
                 { title: 'Version Mismatch' }

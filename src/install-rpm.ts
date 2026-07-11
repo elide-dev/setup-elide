@@ -40,7 +40,7 @@ export async function installViaRpm(
   core.info(`Elide ${version} installed via RPM at ${elidePath}`)
 
   return {
-    version: { tag_name: version, userProvided: options.version !== 'latest' },
+    version: { tag_name: options.version, userProvided: options.version !== 'latest' },
     elidePath,
     elideHome,
     elideBin

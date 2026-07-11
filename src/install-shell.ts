@@ -69,7 +69,7 @@ async function installViaBash(
 
   return {
     version: {
-      tag_name: version,
+      tag_name: options.version,
       userProvided: options.version !== 'latest'
     },
     elidePath,
@@ -105,7 +105,7 @@ async function installViaPowerShell(
 
   return {
     version: {
-      tag_name: version,
+      tag_name: options.version,
       userProvided: options.version !== 'latest'
     },
     elidePath,
