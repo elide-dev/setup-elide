@@ -19,6 +19,9 @@ const GITHUB_DEFAULT_HEADERS = {
 // Matches tags like "nightly-20260328" or "nightly-2026-03-28"
 const NIGHTLY_TAG_RE = /^nightly-(.+)$/
 
+// Matches tags with semver build metadata, like "1.4.0+20260707"
+const BUILD_META_TAG_RE = /^([^+]+)\+(.+)$/
+
 /**
  * Convert a release tag to a valid semver string for use with @actions/tool-cache.
  *
@@ -26,13 +29,14 @@ const NIGHTLY_TAG_RE = /^nightly-(.+)$/
  * for non-semver strings like "nightly-20260328". This causes cache lookups to
  * silently fail (never hit, never store correctly).
  *
- * Mapping:
- *   "1.0.0"              → "1.0.0"          (already semver)
- *   "1.0.0-beta10"       → "1.0.0-beta10"   (valid semver prerelease)
- *   "nightly-20260328"   → "0.0.0-nightly.20260328"
- *
  * We use prerelease (not build metadata with +) because semver.clean strips
  * build metadata, making it useless for cache key matching.
+ *
+ * Mapping:
+ *   "1.0.0"              → "1.0.0"                    (already semver)
+ *   "1.0.0-beta10"       → "1.0.0-beta10"             (valid semver prerelease)
+ *   "1.4.0+20260707"     → "1.4.0-build.20260707"     (build metadata → prerelease)
+ *   "nightly-20260328"   → "0.0.0-nightly.20260328"
  */
 export function toSemverCacheKey(tag: string): string {
   const nightlyMatch = tag.match(NIGHTLY_TAG_RE)
@@ -40,6 +44,11 @@ export function toSemverCacheKey(tag: string): string {
     // Use prerelease segment so semver.clean preserves it
     const datePart = nightlyMatch[1].replaceAll('-', '')
     return `0.0.0-nightly.${datePart}`
+  }
+  const buildMetaMatch = tag.match(BUILD_META_TAG_RE)
+  if (buildMetaMatch) {
+    // semver.clean strips +build metadata; convert to prerelease so it's preserved
+    return `${buildMetaMatch[1]}-build.${buildMetaMatch[2]}`
   }
   return tag
 }
