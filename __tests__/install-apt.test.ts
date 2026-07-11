@@ -86,7 +86,7 @@ describe('install-apt', () => {
     ])
 
     expect(result.elidePath).toBe('/usr/bin/elide')
-    expect(result.version.tag_name).toBe('1.0.0')
+    expect(result.version.tag_name).toBe('latest')
   })
 
   it('should map aarch64 to arm64 for apt', async () => {

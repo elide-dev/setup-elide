@@ -486,7 +486,7 @@ describe('action', () => {
   it('should warn on version mismatch', async () => {
     setupMocks()
     obtainVersionMock.mockResolvedValueOnce('1.0.0').mockResolvedValue('9.9.9')
-    await main.run({ force: true, installer: 'shell' })
+    await main.run({ force: true, installer: 'shell', version: '1.0.0' })
     expect(warningMock).toHaveBeenCalledWith(
       expect.stringContaining('Elide version mismatch'),
       expect.objectContaining({ title: 'Version Mismatch' })

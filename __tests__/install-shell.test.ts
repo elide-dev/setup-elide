@@ -80,7 +80,7 @@ describe('install-shell', () => {
         '--gha'
       ])
       expect(result.elidePath).toBe('/usr/local/bin/elide')
-      expect(result.version.tag_name).toBe('1.0.0')
+      expect(result.version.tag_name).toBe('latest')
     })
 
     it('should pass --version when a specific version is requested', async () => {
@@ -137,7 +137,7 @@ describe('install-shell', () => {
         '-Gha'
       ])
       expect(result.elidePath).toBe('/usr/local/bin/elide')
-      expect(result.version.tag_name).toBe('1.0.0')
+      expect(result.version.tag_name).toBe('latest')
     })
 
     it('should pass -Version when a specific version is requested', async () => {

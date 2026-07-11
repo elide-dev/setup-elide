@@ -26,7 +26,7 @@ export async function installViaPkg(
   core.info(`Elide ${version} installed via PKG at ${elidePath}`)
 
   return {
-    version: { tag_name: version, userProvided: options.version !== 'latest' },
+    version: { tag_name: options.version, userProvided: options.version !== 'latest' },
     elidePath,
     elideHome,
     elideBin

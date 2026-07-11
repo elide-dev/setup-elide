@@ -117,7 +117,7 @@ describe('install-pkg', () => {
     const result = await installViaPkg(options)
 
     expect(result.elidePath).toBe('/usr/local/bin/elide')
-    expect(result.version.tag_name).toBe('1.0.0')
+    expect(result.version.tag_name).toBe('latest')
     expect(result.elideBin).toBe('/usr/local/bin')
     expect(result.elideHome).toBe('/usr/local/bin')
   })

@@ -109,7 +109,7 @@ describe('install-rpm', () => {
       '/tmp/elide.rpm'
     ])
     expect(result.elidePath).toBe('/usr/bin/elide')
-    expect(result.version.tag_name).toBe('1.0.0')
+    expect(result.version.tag_name).toBe('latest')
   })
 
   it('should fall back to rpm when dnf is not available', async () => {
@@ -137,7 +137,7 @@ describe('install-rpm', () => {
       expect.arrayContaining(['dnf'])
     )
     expect(result.elidePath).toBe('/usr/bin/elide')
-    expect(result.version.tag_name).toBe('1.0.0')
+    expect(result.version.tag_name).toBe('latest')
   })
 
   it('should return correct release info', async () => {
@@ -155,7 +155,7 @@ describe('install-rpm', () => {
     expect(result.elidePath).toBe('/usr/bin/elide')
     expect(result.elideBin).toBe('/usr/bin')
     expect(result.elideHome).toBe('/usr/bin')
-    expect(result.version.tag_name).toBe('1.0.0')
+    expect(result.version.tag_name).toBe('1.2.3')
     expect(result.version.userProvided).toBe(true)
   })
 })

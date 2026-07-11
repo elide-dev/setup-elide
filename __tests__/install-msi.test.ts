@@ -117,7 +117,7 @@ describe('install-msi', () => {
     const result = await installViaMsi(options)
 
     expect(result.elidePath).toBe('C:\\Elide\\bin\\elide.exe')
-    expect(result.version.tag_name).toBe('1.0.0')
+    expect(result.version.tag_name).toBe('latest')
     expect(result.version.userProvided).toBe(false)
   })
 
