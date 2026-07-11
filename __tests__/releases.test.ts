@@ -14,11 +14,42 @@ const {
   resolveLatestVersion,
   buildDownloadUrl,
   buildCdnAssetUrl,
+  toSemverCacheKey,
   ArchiveType,
   cdnOs,
   cdnArch
 } = await import('../src/releases')
 const { default: buildOptions } = await import('../src/options')
+
+describe('toSemverCacheKey', () => {
+  it('should leave plain semver unchanged', () => {
+    expect(toSemverCacheKey('1.0.0')).toBe('1.0.0')
+  })
+
+  it('should leave semver prerelease unchanged', () => {
+    expect(toSemverCacheKey('1.0.0-beta10')).toBe('1.0.0-beta10')
+  })
+
+  it('should convert nightly tag to prerelease form', () => {
+    expect(toSemverCacheKey('nightly-20260328')).toBe('0.0.0-nightly.20260328')
+  })
+
+  it('should strip dashes from nightly date portion', () => {
+    expect(toSemverCacheKey('nightly-2026-03-28')).toBe(
+      '0.0.0-nightly.20260328'
+    )
+  })
+
+  it('should convert build metadata tag to prerelease form', () => {
+    expect(toSemverCacheKey('1.4.0+20260707')).toBe('1.4.0-build.20260707')
+  })
+
+  it('should preserve prerelease when build metadata is present', () => {
+    expect(toSemverCacheKey('1.0.0-beta10+20260707')).toBe(
+      '1.0.0-beta10-build.20260707'
+    )
+  })
+})
 
 describe('elide release', () => {
   it('should support resolving the latest version', async () => {

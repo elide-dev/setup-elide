@@ -184,6 +184,7 @@ export async function run(
 
           if (
             version === effectiveOptions.version ||
+            version.startsWith(effectiveOptions.version + '.') ||
             effectiveOptions.version === 'local'
           ) {
             core.notice(`Existing Elide ${version} preserved at ${existing}`, {
@@ -255,7 +256,10 @@ export async function run(
             const ver = await obtainVersion(release.elidePath)
 
             const isNightly = release.version.tag_name.startsWith('nightly-')
-            if (!isNightly && ver !== release.version.tag_name) {
+            const versionMatches =
+              ver === release.version.tag_name ||
+              ver.startsWith(release.version.tag_name + '.')
+            if (!isNightly && !versionMatches) {
               core.warning(
                 `Elide version mismatch: expected '${release.version.tag_name}', but got '${ver}'`,
                 { title: 'Version Mismatch' }
