@@ -103,7 +103,7 @@ This installs the latest nightly build of Elide and adds it to the `PATH`.
 
 ## Installers
 
-The `installer` input controls how Elide is installed. The default (`archive`) downloads a prebuilt archive from the Elide CDN and caches it using the GitHub Actions tool cache.
+The `installer` input controls how Elide is installed. The default (`archive`) downloads a prebuilt archive from the Elide CDN (or, for pinned nightly/build-metadata versions, the matching GitHub release asset) and caches it using the GitHub Actions tool cache.
 
 | Installer | Platforms | Description |
 |---|---|---|

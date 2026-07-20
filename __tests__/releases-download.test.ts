@@ -56,8 +56,12 @@ mock.module('../src/command', () => ({
   elideInfo: jest.fn()
 }))
 
-const { downloadRelease, resolveLatestVersion, toSemverCacheKey } =
-  await import('../src/releases')
+const {
+  downloadRelease,
+  resolveLatestVersion,
+  resolveVersionByTag,
+  toSemverCacheKey
+} = await import('../src/releases')
 const { default: buildOptions } = await import('../src/options')
 
 describe('resolveLatestVersion', () => {
@@ -112,6 +116,71 @@ describe('resolveLatestVersion', () => {
     expect(warningMock).toHaveBeenCalledWith(
       expect.stringContaining('No GitHub token provided')
     )
+  })
+})
+
+describe('resolveVersionByTag', () => {
+  beforeEach(() => {
+    requestMock.mockClear()
+    getOctokitMock.mockClear()
+    warningMock.mockClear()
+    debugMock.mockClear()
+  })
+
+  it('should resolve a tag with matching assets', async () => {
+    requestMock.mockResolvedValue({
+      data: {
+        tag_name: '1.4.1+20260716',
+        name: 'Elide 1.4.1+20260716',
+        assets: [
+          {
+            name: 'elide.linux-amd64.tgz',
+            browser_download_url:
+              'https://github.com/elide-dev/elide/releases/download/1.4.1%2B20260716/elide.linux-amd64.tgz'
+          }
+        ]
+      }
+    })
+    const result = await resolveVersionByTag('1.4.1+20260716', 'ghp_test')
+    expect(result.tag_name).toBe('1.4.1+20260716')
+    expect(result.userProvided).toBe(true)
+    expect(result.assets).toHaveLength(1)
+    expect(result.assets?.[0].name).toBe('elide.linux-amd64.tgz')
+  })
+
+  it('should warn when no token is provided', async () => {
+    requestMock.mockResolvedValue({ data: { tag_name: 'x', assets: [] } })
+    await resolveVersionByTag('nightly-20260328')
+    expect(warningMock).toHaveBeenCalledWith(
+      expect.stringContaining('No GitHub token provided')
+    )
+  })
+
+  it('should retry on transient failure and succeed', async () => {
+    requestMock
+      .mockRejectedValueOnce(new Error('rate limit exceeded'))
+      .mockResolvedValueOnce({
+        data: { tag_name: 'nightly-20260328', assets: [] }
+      })
+    const result = await resolveVersionByTag('nightly-20260328')
+    expect(result.tag_name).toBe('nightly-20260328')
+    expect(requestMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should fall back immediately on a definitive not-found, without throwing', async () => {
+    requestMock.mockRejectedValue(
+      Object.assign(new Error('Not Found'), { status: 404 })
+    )
+    const result = await resolveVersionByTag('1.4.1+20260716')
+    expect(result).toEqual({ tag_name: '1.4.1+20260716', userProvided: true })
+    expect(requestMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should fall back after exhausting retries on transient errors, without throwing', async () => {
+    requestMock.mockRejectedValue(new Error('quota exhausted'))
+    const result = await resolveVersionByTag('1.4.1+20260716')
+    expect(result).toEqual({ tag_name: '1.4.1+20260716', userProvided: true })
+    expect(requestMock).toHaveBeenCalledTimes(3)
   })
 })
 
@@ -188,6 +257,109 @@ describe('downloadRelease', () => {
     expect(downloadToolMock).toHaveBeenCalled()
     expect(result.version.tag_name).toBe('1.2.3')
     expect(result.version.userProvided).toBe(true)
+  })
+
+  it('should resolve a build-metadata pin via GitHub API and prefer the matching asset URL', async () => {
+    requestMock.mockResolvedValue({
+      data: {
+        tag_name: '1.4.1+20260716',
+        name: 'Elide 1.4.1+20260716',
+        assets: [
+          {
+            name: 'elide.linux-amd64.tgz',
+            browser_download_url:
+              'https://github.com/elide-dev/elide/releases/download/tag/elide.linux-amd64.tgz'
+          }
+        ]
+      }
+    })
+    const options = buildOptions({
+      os: 'linux',
+      arch: 'amd64',
+      version: '1.4.1+20260716'
+    })
+    const result = await downloadRelease(options)
+    expect(requestMock).toHaveBeenCalled()
+    expect(downloadToolMock).toHaveBeenCalledWith(
+      'https://github.com/elide-dev/elide/releases/download/tag/elide.linux-amd64.tgz'
+    )
+    expect(result.version.tag_name).toBe('1.4.1+20260716')
+  })
+
+  it('should prefer a tgz release asset even when xz is available locally but no txz asset was published', async () => {
+    whichMock.mockResolvedValue('/usr/bin/xz')
+    requestMock.mockResolvedValue({
+      data: {
+        tag_name: '1.4.1+20260716',
+        name: 'Elide 1.4.1+20260716',
+        assets: [
+          {
+            name: 'elide.linux-amd64.tgz',
+            browser_download_url:
+              'https://github.com/elide-dev/elide/releases/download/tag/elide.linux-amd64.tgz'
+          }
+        ]
+      }
+    })
+    const options = buildOptions({
+      os: 'linux',
+      arch: 'amd64',
+      version: '1.4.1+20260716'
+    })
+    const result = await downloadRelease(options)
+    expect(downloadToolMock).toHaveBeenCalledWith(
+      'https://github.com/elide-dev/elide/releases/download/tag/elide.linux-amd64.tgz'
+    )
+    expect(result.version.tag_name).toBe('1.4.1+20260716')
+  })
+
+  it('should NOT call the GitHub API for a build-metadata pin on a warm cache hit', async () => {
+    findMock.mockReturnValue('/cache/tools/elide/1.4.1-build.20260716/amd64')
+    const options = buildOptions({
+      os: 'linux',
+      arch: 'amd64',
+      version: '1.4.1+20260716'
+    })
+    const result = await downloadRelease(options)
+    expect(requestMock).not.toHaveBeenCalled()
+    expect(downloadToolMock).not.toHaveBeenCalled()
+    expect(result.cached).toBe(true)
+  })
+
+  it('should NOT call the GitHub API for a "+"-containing pin that is not semver-shaped', async () => {
+    const options = buildOptions({
+      os: 'linux',
+      arch: 'amd64',
+      version: 'myfork+patch1'
+    })
+    await downloadRelease(options)
+    expect(requestMock).not.toHaveBeenCalled()
+  })
+
+  it('should fall back to the CDN URL when the build-metadata tag lookup fails', async () => {
+    requestMock.mockRejectedValue(
+      Object.assign(new Error('Not Found'), { status: 404 })
+    )
+    const options = buildOptions({
+      os: 'linux',
+      arch: 'amd64',
+      version: '1.4.1+20260716'
+    })
+    const result = await downloadRelease(options)
+    expect(downloadToolMock).toHaveBeenCalledWith(
+      expect.stringContaining('elide.zip/artifacts')
+    )
+    expect(result.version.tag_name).toBe('1.4.1+20260716')
+  })
+
+  it('should NOT call the GitHub API for a plain semver pin (scoping regression guard)', async () => {
+    const options = buildOptions({
+      os: 'linux',
+      arch: 'amd64',
+      version: '1.2.3'
+    })
+    await downloadRelease(options)
+    expect(requestMock).not.toHaveBeenCalled()
   })
 
   it('should use a cached copy when available', async () => {

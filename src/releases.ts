@@ -19,8 +19,11 @@ const GITHUB_DEFAULT_HEADERS = {
 // Matches tags like "nightly-20260328" or "nightly-2026-03-28"
 const NIGHTLY_TAG_RE = /^nightly-(.+)$/
 
-// Matches tags with semver build metadata, like "1.4.0+20260707"
-const BUILD_META_TAG_RE = /^([^+]+)\+(.+)$/
+// Matches tags with semver build metadata, like "1.4.0+20260707". Requires a
+// semver-shaped prefix (major.minor.patch, optional prerelease) so arbitrary
+// "+"-containing strings (fork tags, typos) don't get treated as nightly
+// build-metadata tags.
+const BUILD_META_TAG_RE = /^(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\+(.+)$/
 
 /**
  * Convert a release tag to a valid semver string for use with @actions/tool-cache.
@@ -54,6 +57,17 @@ export function toSemverCacheKey(tag: string): string {
 }
 
 /**
+ * A single downloadable asset attached to a GitHub release.
+ */
+export type ReleaseAsset = {
+  // Asset file name, e.g. "elide.linux-amd64.tgz".
+  name: string
+
+  // Direct download URL for the asset (GitHub's `browser_download_url`).
+  url: string
+}
+
+/**
  * Version info resolved for a release of Elide.
  */
 export type ElideVersionInfo = {
@@ -65,6 +79,9 @@ export type ElideVersionInfo = {
 
   // Whether this version is resolved (`false`) or user-provided (`true`).
   userProvided: boolean
+
+  // Release assets, if resolved via the GitHub API (nightly/build-metadata tags only).
+  assets?: ReleaseAsset[]
 }
 
 /**
@@ -178,27 +195,70 @@ export function buildCdnAssetUrl(
 }
 
 /**
+ * Find a release asset matching the current platform, if one is available.
+ *
+ * @param version Resolved version info (may or may not carry `assets`).
+ * @param options Effective options (uses os, arch).
+ * @param ext File extension to match (e.g. 'tgz', 'txz', 'zip').
+ * @return The asset's download URL, or `null` if none matched.
+ */
+function findAssetUrl(
+  version: ElideVersionInfo,
+  options: ElideSetupActionOptions,
+  ext: string
+): string | null {
+  if (!version.assets || version.assets.length === 0) {
+    return null
+  }
+  const os = cdnOs(options.os)
+  const arch = cdnArch(options.arch)
+  const assetName = `elide.${os}-${arch}.${ext}`
+  return version.assets.find(a => a.name === assetName)?.url ?? null
+}
+
+/**
  * Build a download URL for an Elide release archive.
  * Selects the best archive format based on local tool availability.
+ * If `version` carries release assets with a match for the current platform
+ * (resolved via {@link resolveVersionByTag} for nightly/build-metadata tags),
+ * that asset's URL is preferred over the CDN URL.
  *
  * @param options Effective options.
+ * @param version Resolved version info; may carry release assets to prefer.
  * @return URL and archive type to use.
  */
 export async function buildDownloadUrl(
-  options: ElideSetupActionOptions
+  options: ElideSetupActionOptions,
+  version?: ElideVersionInfo
 ): Promise<{ url: URL; archiveType: ArchiveType }> {
-  let ext = 'tgz'
-  let archiveType = ArchiveType.GZIP
   const hasXz = await which('xz')
 
-  if (options.os === ElideOS.WINDOWS) {
-    ext = 'zip'
-    archiveType = ArchiveType.ZIP
-  } else if (hasXz) {
-    ext = 'txz'
-    archiveType = ArchiveType.TXZ
+  // Candidate archive formats in preference order. TXZ requires the `xz`
+  // CLI tool locally (unpackRelease shells out to it); GZIP/ZIP don't. A
+  // release may not publish every format, so when matching against release
+  // assets we try each viable candidate rather than committing to just the
+  // most-preferred one and missing an asset published in another format.
+  const candidates: { ext: string; archiveType: ArchiveType }[] =
+    options.os === ElideOS.WINDOWS
+      ? [{ ext: 'zip', archiveType: ArchiveType.ZIP }]
+      : hasXz
+        ? [
+            { ext: 'txz', archiveType: ArchiveType.TXZ },
+            { ext: 'tgz', archiveType: ArchiveType.GZIP }
+          ]
+        : [{ ext: 'tgz', archiveType: ArchiveType.GZIP }]
+
+  if (version) {
+    for (const candidate of candidates) {
+      const assetUrl = findAssetUrl(version, options, candidate.ext)
+      if (assetUrl) {
+        core.debug(`Using GitHub release asset for download: ${assetUrl}`)
+        return { archiveType: candidate.archiveType, url: new URL(assetUrl) }
+      }
+    }
   }
 
+  const { ext, archiveType } = candidates[0]
   return {
     archiveType,
     url: buildCdnAssetUrl(options, ext)
@@ -371,17 +431,96 @@ export async function resolveLatestVersion(
 }
 
 /**
+ * Resolve a nightly or build-metadata-tagged release by its exact tag, via the GitHub
+ * Releases API. Used only for tags shaped like `nightly-<...>` or `<semver>+<build>`,
+ * since the CDN does not reliably publish artifacts at those exact revision strings.
+ *
+ * Unlike `resolveLatestVersion`, this function never throws: on any failure (not-found,
+ * transient error, exhausted retries) it falls back to a plain, asset-less version info
+ * object so callers degrade gracefully to today's CDN-only download path.
+ *
+ * @param tag The exact tag to look up (e.g. "1.4.1+20260716" or "nightly-20260328").
+ * @param token GitHub token active for this workflow step.
+ */
+export async function resolveVersionByTag(
+  tag: string,
+  token?: string
+): Promise<ElideVersionInfo> {
+  if (!token) {
+    core.warning(
+      'No GitHub token provided. API requests may be rate-limited. ' +
+        'Set the `token` input or ensure GITHUB_TOKEN is available.'
+    )
+  }
+  const octokit = token ? github.getOctokit(token) : new Octokit({})
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const release = await octokit.request(
+        'GET /repos/{owner}/{repo}/releases/tags/{tag}',
+        {
+          owner: 'elide-dev',
+          repo: 'elide',
+          tag,
+          headers: GITHUB_DEFAULT_HEADERS
+        }
+      )
+
+      const name = release.data?.name || undefined
+      const assets: ReleaseAsset[] = (release.data.assets ?? []).map(a => ({
+        name: a.name,
+        url: a.browser_download_url
+      }))
+      return {
+        tag_name: tag,
+        name,
+        userProvided: true,
+        assets
+      }
+    } catch (err) {
+      const lastError = err instanceof Error ? err : new Error(String(err))
+      const status = (err as { status?: number } | undefined)?.status
+      const isNotFound =
+        status === 404 || lastError.message.includes('Not Found')
+
+      if (isNotFound) {
+        core.debug(
+          `No release found for tag '${tag}' via GitHub API; falling back to CDN. (${lastError.message})`
+        )
+        break
+      }
+
+      if (attempt < MAX_RETRIES) {
+        const delay = RETRY_DELAY_MS * attempt
+        core.warning(
+          `GitHub API request failed (attempt ${attempt}/${MAX_RETRIES}): ${lastError.message}. Retrying in ${delay}ms...`
+        )
+        await new Promise(resolve => setTimeout(resolve, delay))
+      } else {
+        core.warning(
+          `Exhausted retries resolving tag '${tag}' via GitHub API; falling back to CDN. (${lastError.message})`,
+          { title: 'GitHub API Resolution Failed' }
+        )
+      }
+    }
+  }
+
+  return { tag_name: tag, userProvided: true }
+}
+
+/**
  * Conditionally download the desired version of Elide, or use a cached version, if available.
  *
  * @param version Resolved version info for the desired copy of Elide.
  * @param options Effective setup action options.
+ * @param resolveAssets Optional lazy resolver for release assets (e.g. {@link resolveVersionByTag}).
+ *   Invoked only on a cache miss, since a cache hit never needs release assets to build a download URL.
  */
 async function maybeDownload(
   version: ElideVersionInfo,
-  options: ElideSetupActionOptions
+  options: ElideSetupActionOptions,
+  resolveAssets?: () => Promise<ElideVersionInfo>
 ): Promise<ElideRelease> {
-  // build download URL, use result from cache or disk
-  const { url, archiveType } = await buildDownloadUrl(options)
   const sep = options.os === ElideOS.WINDOWS ? '\\' : '/'
   const binName = options.os === ElideOS.WINDOWS ? 'elide.exe' : 'elide'
   let targetBin = `${options.install_path}${sep}bin${sep}${binName}`
@@ -421,6 +560,13 @@ async function maybeDownload(
     } else {
       core.debug('Cache enabled but no hit was found; downloading release')
     }
+
+    // Only resolve release assets (a GitHub API round-trip) once we know
+    // we actually need to download — a cache hit never needs them.
+    if (resolveAssets) {
+      version = await resolveAssets()
+    }
+    const { url, archiveType } = await buildDownloadUrl(options, version)
 
     core.info(`Installing from URL: ${url} (type: ${archiveType})`)
 
@@ -528,9 +674,24 @@ export async function downloadRelease(
   } else {
     // resolve applicable version
     let versionInfo: ElideVersionInfo
+    let resolveAssets: (() => Promise<ElideVersionInfo>) | undefined
     if (options.version === 'latest') {
       core.debug('Resolving latest version via GitHub API')
       versionInfo = await resolveLatestVersion(options.token)
+    } else if (
+      NIGHTLY_TAG_RE.test(options.version) ||
+      BUILD_META_TAG_RE.test(options.version)
+    ) {
+      // Defer the GitHub API call until maybeDownload confirms a cache miss —
+      // a cache hit never needs release assets, only the tag string below.
+      versionInfo = { tag_name: options.version, userProvided: true }
+      const pinnedVersion = options.version
+      resolveAssets = () => {
+        core.debug(
+          `Resolving pinned nightly/build-metadata tag '${pinnedVersion}' via GitHub API`
+        )
+        return resolveVersionByTag(pinnedVersion, options.token)
+      }
     } else {
       versionInfo = {
         tag_name: options.version,
@@ -539,6 +700,6 @@ export async function downloadRelease(
     }
 
     // setup caching with the effective version and perform download
-    return maybeDownload(versionInfo, options)
+    return maybeDownload(versionInfo, options, resolveAssets)
   }
 }
