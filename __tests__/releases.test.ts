@@ -56,6 +56,18 @@ describe('toSemverCacheKey', () => {
       '1.4.0-build.20260707.abc123'
     )
   })
+
+  it('should pass through build metadata with invalid semver identifier characters unchanged', () => {
+    // An underscore isn't a valid semver identifier character; converting
+    // this to a "-build.foo_bar" prerelease would itself not be valid
+    // semver, defeating the point of toSemverCacheKey. Leave it unchanged
+    // rather than emit an unusable cache key.
+    expect(toSemverCacheKey('1.0.0+foo_bar')).toBe('1.0.0+foo_bar')
+  })
+
+  it('should not treat a non-semver "+"-containing string as build metadata', () => {
+    expect(toSemverCacheKey('myfork+patch1')).toBe('myfork+patch1')
+  })
 })
 
 describe('elide release', () => {

@@ -20,10 +20,14 @@ const GITHUB_DEFAULT_HEADERS = {
 const NIGHTLY_TAG_RE = /^nightly-(.+)$/
 
 // Matches tags with semver build metadata, like "1.4.0+20260707". Requires a
-// semver-shaped prefix (major.minor.patch, optional prerelease) so arbitrary
-// "+"-containing strings (fork tags, typos) don't get treated as nightly
-// build-metadata tags.
-const BUILD_META_TAG_RE = /^(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\+(.+)$/
+// semver-shaped prefix (major.minor.patch, optional prerelease) and a build
+// segment made of valid semver identifiers (dot-separated alphanumerics/
+// hyphens), so arbitrary "+"-containing strings (fork tags, typos, or a
+// build segment with e.g. an underscore) don't get treated as nightly
+// build-metadata tags — toSemverCacheKey's `-build.<segment>` substitution
+// must itself always be a semver-cleanable string.
+const BUILD_META_TAG_RE =
+  /^(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)$/
 
 /**
  * Convert a release tag to a valid semver string for use with @actions/tool-cache.

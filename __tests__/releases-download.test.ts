@@ -119,6 +119,22 @@ describe('resolveLatestVersion', () => {
   })
 })
 
+// resolveVersionByTag's retry loop sleeps for real between attempts; run the
+// callback with setTimeout firing immediately so retry tests don't pay that
+// delay in wall-clock time.
+async function withInstantRetryDelay<T>(fn: () => Promise<T>): Promise<T> {
+  const realSetTimeout = globalThis.setTimeout
+  globalThis.setTimeout = ((cb: () => void) => {
+    cb()
+    return 0 as unknown as ReturnType<typeof setTimeout>
+  }) as typeof setTimeout
+  try {
+    return await fn()
+  } finally {
+    globalThis.setTimeout = realSetTimeout
+  }
+}
+
 describe('resolveVersionByTag', () => {
   beforeEach(() => {
     requestMock.mockClear()
@@ -162,7 +178,9 @@ describe('resolveVersionByTag', () => {
       .mockResolvedValueOnce({
         data: { tag_name: 'nightly-20260328', assets: [] }
       })
-    const result = await resolveVersionByTag('nightly-20260328')
+    const result = await withInstantRetryDelay(() =>
+      resolveVersionByTag('nightly-20260328')
+    )
     expect(result.tag_name).toBe('nightly-20260328')
     expect(requestMock).toHaveBeenCalledTimes(2)
   })
@@ -178,7 +196,9 @@ describe('resolveVersionByTag', () => {
 
   it('should fall back after exhausting retries on transient errors, without throwing', async () => {
     requestMock.mockRejectedValue(new Error('quota exhausted'))
-    const result = await resolveVersionByTag('1.4.1+20260716')
+    const result = await withInstantRetryDelay(() =>
+      resolveVersionByTag('1.4.1+20260716')
+    )
     expect(result).toEqual({ tag_name: '1.4.1+20260716', userProvided: true })
     expect(requestMock).toHaveBeenCalledTimes(3)
   })
